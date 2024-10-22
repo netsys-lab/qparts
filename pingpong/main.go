@@ -50,7 +50,6 @@ func main() {
 
 		buf := make([]byte, 1400)
 		for {
-			time.Sleep(100 * time.Second)
 			n, err := stream.Read(buf)
 			if err != nil {
 				log.Fatal(err)
@@ -81,7 +80,6 @@ func main() {
 		go func() {
 			buf := make([]byte, 1400)
 			for {
-				time.Sleep(100 * time.Second)
 				n, err := stream.Read(buf)
 				if err != nil {
 					log.Fatal(err)
@@ -95,7 +93,6 @@ func main() {
 		// Write hello world into buf
 		copy(buf, "Hello World")
 		for {
-			time.Sleep(100 * time.Second)
 			n, err := stream.Write(buf)
 			if err != nil {
 				log.Fatal(err)

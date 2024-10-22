@@ -14,6 +14,7 @@ type Scheduler struct {
 	activePlugin SchedulerPlugin
 }
 
+// We need to have the internal stream id here
 type DataAssignment struct {
 	Path   *PartsPath
 	Data   []byte

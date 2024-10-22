@@ -1,7 +1,11 @@
 package qparts
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"math/rand"
+	"sync"
+	"time"
 
 	"github.com/scionproto/scion/pkg/snet"
 )
@@ -61,7 +65,99 @@ func (dp *QPartsDataplane) AddListenStream(id uint64, ssqc *SingleStreamQUICConn
 	return nil
 }
 
+// Function to generate a random byte array of a given size
+func generateRandomBytes(size int) ([]byte, error) {
+	bytes := make([]byte, size)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
 func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision, id uint64) (int, error) {
 	fmt.Println("Writing to stream ", id)
+	var wg sync.WaitGroup
+	time.Sleep(2 * time.Second)
+	for streamId, stream := range dp.Streams {
+		wg.Add(1)
+		go func(streamId uint64, stream *QPartsDataplaneStream) {
+
+			partsDatapacket := NewQPartsDataplanePacket()
+			partsDatapacket.Flags = PARTS_MSG_DATA
+			partsDatapacket.StreamId = id
+			partsDatapacket.PartId = 1
+			partsDatapacket.FrameId = 1
+
+			data, _ := generateRandomBytes(1000000)
+			fmt.Printf("%x\n", sha256.Sum256(data))
+
+			partsDatapacket.FrameSize = uint64(len(data))
+			partsDatapacket.Encode()
+
+			n, err := stream.ssqc.WriteAll(partsDatapacket.Data)
+			if err != nil {
+				panic(err)
+			}
+
+			if n <= 0 {
+				panic("No data sent")
+			}
+			fmt.Println("Sent data packet: ", n)
+
+			n, err = stream.ssqc.WriteAll(data)
+			if err != nil {
+				panic(err)
+			}
+			if n <= 0 {
+				panic("No data sent")
+			}
+
+			fmt.Println("sENT: ", partsDatapacket)
+			fmt.Println("On stream ", streamId)
+
+		}(streamId, stream)
+	}
+	wg.Wait()
 	return 0, nil
+}
+
+func (dp *QPartsDataplane) readLoop() error {
+	// TODO: Make it capable of adding/removing streams
+	fmt.Println("Starting read loop")
+	var wg sync.WaitGroup
+	for streamId, stream := range dp.Streams {
+		wg.Add(1)
+		go func(streamId uint64, stream *QPartsDataplaneStream) {
+
+			for {
+				partsDatapacket := NewQPartsDataplanePacket()
+				n, err := stream.ssqc.ReadAll(partsDatapacket.Data)
+				if err != nil {
+					panic(err)
+				}
+				if n <= 0 {
+					panic("No data received")
+				}
+
+				partsDatapacket.Decode()
+				fmt.Println("Received: ", partsDatapacket)
+				fmt.Println("On stream ", streamId)
+
+				data := make([]byte, partsDatapacket.FrameSize)
+				n, err = stream.ssqc.ReadAll(data)
+				if err != nil {
+					panic(err)
+				}
+				if n <= 0 {
+					panic("No data received")
+				}
+
+				fmt.Printf("Received %x\n", sha256.Sum256(data))
+			}
+		}(streamId, stream)
+	}
+
+	wg.Wait()
+	return nil
 }

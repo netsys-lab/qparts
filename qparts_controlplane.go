@@ -20,14 +20,16 @@ type ControlPlane struct {
 	ControlConn     *SingleStreamQUICConn
 	localHandshake  *QPartsHandshakePacket
 	remoteHandshake *QPartsHandshakePacket
+	pConn           *QPartsConn
 }
 
-func NewQPartsControlPlane(local *snet.UDPAddr, streams map[uint64]*PartsStream, dp *QPartsDataplane) *ControlPlane {
+func NewQPartsControlPlane(local *snet.UDPAddr, streams map[uint64]*PartsStream, dp *QPartsDataplane, pconn *QPartsConn) *ControlPlane {
 	return &ControlPlane{
 		ErrChan:     make(chan error),
 		streams:     streams,
 		local:       local,
 		dp:          dp,
+		pConn:       pconn,
 		Scheduler:   NewScheduler(),
 		ControlConn: NewSingleStreamQUICConn(getCertificateFunc),
 	}
@@ -168,16 +170,26 @@ func (cp *ControlPlane) ListenAndAccept() error {
 
 func (p *ControlPlane) AcceptStream() (*PartsStream, error) {
 
-	// Generate new Parts Stream here
+	// TODO: Send this information over control plane conn?
+	s := &PartsStream{
+		Id:         newConnId(),
+		scheduler:  p.Scheduler,
+		conn:       p.pConn,
+		ReadBuffer: NewPacketBuffer(1024),
+	}
+	p.streams[s.Id] = s
 
-	// p.Streams[s.Id] = s
-	// p.Dataplane.streams[s.Id] = s
-	s := &PartsStream{}
 	return s, nil
 }
 
 func (p *ControlPlane) OpenStream() (*PartsStream, error) {
-	s := &PartsStream{}
+	s := &PartsStream{
+		Id:         newConnId(),
+		scheduler:  p.Scheduler,
+		conn:       p.pConn,
+		ReadBuffer: NewPacketBuffer(1024),
+	}
+	p.streams[s.Id] = s
 	return s, nil
 }
 
@@ -229,11 +241,13 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 			if err != nil {
 				panic(err)
 			}
+			wg.Done()
 
 		}(i)
 	}
 	wg.Wait()
-
+	fmt.Println("Done waiting")
+	cp.dp.readLoop()
 	return nil
 }
 
@@ -278,9 +292,12 @@ func (cp *ControlPlane) RaceListenDataplaneStreams() error {
 			if err != nil {
 				panic(err)
 			}
+			wg.Done()
 
 		}(i)
 	}
 	wg.Wait()
+	fmt.Println("Done waiting")
+	cp.dp.readLoop()
 	return nil
 }

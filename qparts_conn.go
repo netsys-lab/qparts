@@ -42,11 +42,12 @@ func NewQPartsConn(local *snet.UDPAddr) *QPartsConn {
 	partsConn := &QPartsConn{
 		local: local,
 		// remote: remote,
-		// Dataplane:    dp,
-		ControlPlane: NewQPartsControlPlane(local, streams, dp),
-		scheduler:    NewScheduler(),
-		Streams:      streams,
+		Dataplane: dp,
+
+		scheduler: NewScheduler(),
+		Streams:   streams,
 	}
+	partsConn.ControlPlane = NewQPartsControlPlane(local, streams, dp, partsConn)
 	// partsConn.ControlPlane.Conn = partsConn
 	partsConn.ControlPlane.Scheduler = partsConn.scheduler
 	// partsConn.Dataplane.SetControlPlane(partsConn.ControlPlane)

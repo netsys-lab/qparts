@@ -266,7 +266,7 @@ func selectPaths(allPaths []*PartsPath, count int, strategy string, state *Netwo
 
 func (sr *SchedulerSbd) ScheduleWrite(data []byte, stream *PartsStream, state *NetworkState) SchedulingDecision {
 
-	s := stream.Conn.remote.String()
+	s := stream.conn.remote.String()
 
 	if len(sr.paths) == 0 {
 		sr.paths = selectPaths(state.Remotes[s].Paths, sr.numPaths, sr.strategy, state, s)

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"fmt"
 	"io"
 	"net"
 	"time"
@@ -28,14 +27,15 @@ func (c connectedPacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	return n, c.RemoteAddr(), err
 }
 
-type GetCertificateFunc func(local string) ([]tls.Certificate, error)
+type GetCertificateFunc func(local *snet.UDPAddr) ([]tls.Certificate, error)
 
 type SingleStreamQUICConn struct {
-	local           string
+	local           *snet.UDPAddr
 	qconn           quic.Connection
 	stream          quic.Stream
 	listener        *quic.Listener
 	certificateFunc GetCertificateFunc
+	optConn         *optimizedconn.OptimizedSCIONConn
 }
 
 func (ssqc *SingleStreamQUICConn) Close() error {
@@ -69,19 +69,20 @@ func (ssqc *SingleStreamQUICConn) RemoteAddr() *snet.UDPAddr {
 	return ssqc.qconn.RemoteAddr().(*snet.UDPAddr)
 }
 
+// TODO: Not implemented
+func (ssqc *SingleStreamQUICConn) SetPath(path snet.DataplanePath) error {
+	// err := ssqc.optConn.SetPath(path)
+	// return err
+	return nil
+}
+
 func NewSingleStreamQUICConn(certificateFunc GetCertificateFunc) *SingleStreamQUICConn {
 	return &SingleStreamQUICConn{certificateFunc: certificateFunc}
 }
 
-func (ssqc *SingleStreamQUICConn) ListenAndAccept(local string) error {
-	// local := "1-150,127.0.0.1:4443"
-	addr, err := snet.ParseUDPAddr(local)
-	if err != nil {
-		return err
-	}
-
-	lAddr := addr.Host.AddrPort()
-	udpAddr := net.UDPAddrFromAddrPort(lAddr)
+func (ssqc *SingleStreamQUICConn) ListenAndAccept(local *snet.UDPAddr) error {
+	ssqc.local = local
+	udpAddr := net.UDPAddrFromAddrPort(local.Host.AddrPort())
 	conn, err := optimizedconn.Listen(udpAddr)
 	if err != nil {
 		return err
@@ -119,29 +120,16 @@ func (ssqc *SingleStreamQUICConn) ListenAndAccept(local string) error {
 	return nil
 }
 
-func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote string) error {
-	raddr, err := snet.ParseUDPAddr(remote)
-	if err != nil {
-		return err
-	}
-	rAddrPort := raddr.Host.AddrPort()
+func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote *snet.UDPAddr) error {
+	rAddrPort := remote.Host.AddrPort()
 	rudpAddr := net.UDPAddrFromAddrPort(rAddrPort)
 
-	laddr, err := snet.ParseUDPAddr(local)
-	if err != nil {
-		return err
-	}
-
-	lAddrPort := laddr.Host.AddrPort()
+	lAddrPort := local.Host.AddrPort()
 	ludpAddr := net.UDPAddrFromAddrPort(lAddrPort)
 
-	h := host()
-	paths, err := h.queryPaths(context.Background(), raddr.IA)
-	fmt.Println(paths)
+	ssqc.local = local
 
-	raddr.Path = paths[0].Dataplane()
-
-	conn, err := optimizedconn.Dial(ludpAddr, raddr)
+	conn, err := optimizedconn.Dial(ludpAddr, remote)
 	if err != nil {
 		return err
 	}

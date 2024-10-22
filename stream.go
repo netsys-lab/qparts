@@ -16,7 +16,7 @@ type PartsStream struct {
 	Id         uint64
 	scheduler  *Scheduler
 	ReadBuffer *PacketBuffer
-	Conn       *PartsConn
+	conn       *QPartsConn
 }
 
 func NewPartsStream(id uint64, scheduler *Scheduler) *PartsStream {
@@ -49,29 +49,30 @@ func (s *PartsStream) Write(b []byte) (n int, err error) {
 	assignments := s.scheduler.ScheduleWrite(b, s)
 
 	for i, _ := range assignments.Assignments {
-		assignments.Assignments[i].Remote = s.Conn.remote
+		assignments.Assignments[i].Remote = s.conn.remote
 		//Log.Info("----------------------")
 		//Log.Info(assignments.Assignments[i].Remote)
 	}
-	return s.Conn.Dataplane.WriteForStream(&assignments, s.Id)
+	return s.conn.Dataplane.WriteForStream(&assignments, s.Id)
 
 }
 
+// TODO: Implement
 func (s *PartsStream) Close() error {
-	s.Conn.ControlPlane.RemoveStream(s.Id)
-	s.Conn.Dataplane.RemoveStream(s.Id)
+	// s.Conn.ControlPlane.RemoveStream(s.Id)
+	// s.Conn.Dataplane.RemoveStream(s.Id)
 	return nil
 }
 
 func (s *PartsStream) LocalAddr() net.Addr {
-	return s.Conn.local
+	return s.conn.local
 }
 
 func (s *PartsStream) RemoteAddr() net.Addr {
-	return s.Conn.remote
+	return s.conn.remote
 }
 
-// TODO: Implement these, need to be somehow connected to the underlying sockets
+// TODO: Implement these, maybe by a single mutex or something
 func (s *PartsStream) SetDeadline(t time.Time) error {
 	return nil
 }

@@ -9,12 +9,6 @@ import (
 	"github.com/scionproto/scion/pkg/snet"
 )
 
-var Serializers map[string]*SCIONPacketSerializer
-
-func init() {
-	Serializers = make(map[string]*SCIONPacketSerializer)
-}
-
 type PartsPath struct {
 	Internal    snet.Path
 	Interfaces  []string

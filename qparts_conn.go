@@ -29,21 +29,21 @@ type QPartsConn struct {
 	local        *snet.UDPAddr
 	remote       *snet.UDPAddr
 	scheduler    *Scheduler
-	Dataplane    *PartsDataplane
+	Dataplane    *QPartsDataplane
 	ControlPlane *ControlPlane
 	Streams      map[uint64]*PartsStream
 }
 
 func NewQPartsConn(local *snet.UDPAddr) *QPartsConn {
 	streams := make(map[uint64]*PartsStream)
-	// dp := NewDataplane(local, remote, streams)
+	dp := NewQPartsDataplane()
 	//Log.Info("Got remote: ", remote.String())
 	//Log.Info("Got remote Host: ", remote.Host.String())
 	partsConn := &QPartsConn{
 		local: local,
 		// remote: remote,
 		// Dataplane:    dp,
-		ControlPlane: NewQPartsControlPlane(local, streams),
+		ControlPlane: NewQPartsControlPlane(local, streams, dp),
 		scheduler:    NewScheduler(),
 		Streams:      streams,
 	}

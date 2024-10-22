@@ -14,7 +14,7 @@ func NewSchedulerRoundRobin() *SchedulerRoundRobin {
 
 func (sr *SchedulerRoundRobin) ScheduleWrite(data []byte, stream *PartsStream, state *NetworkState) SchedulingDecision {
 
-	s := stream.Conn.remote.String()
+	s := stream.conn.remote.String()
 	Log.Info("Scheduling write for index", sr.index)
 	da := DataAssignment{
 		Path: state.Remotes[s].Paths[sr.index],

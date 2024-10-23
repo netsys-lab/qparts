@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/netsys-lab/qparts/pkg/qpnet"
+	"github.com/netsys-lab/qparts/pkg/qpproto"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
 )
 
@@ -102,7 +103,7 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 	for i, dataAssignment := range schedulingDecision.Assignments {
 		wg.Add(1)
 		go func(dataAssignment DataAssignment, i int) {
-			partsDatapacket := NewQPartsDataplanePacket()
+			partsDatapacket := qpproto.NewQPartsDataplanePacket()
 			partsDatapacket.Flags = PARTS_MSG_DATA
 			partsDatapacket.StreamId = id
 			partsDatapacket.SequenceId = compl.SequenceId
@@ -192,7 +193,7 @@ func (dp *QPartsDataplane) readLoop() error {
 		go func(streamId uint64, stream *QPartsDataplaneStream) {
 
 			for {
-				partsDatapacket := NewQPartsDataplanePacket()
+				partsDatapacket := qpproto.NewQPartsDataplanePacket()
 				n, err := stream.ssqc.ReadAll(partsDatapacket.Data)
 				if err != nil {
 					panic(err)

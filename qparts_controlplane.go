@@ -10,6 +10,7 @@ import (
 	"github.com/netsys-lab/qparts/pkg/qpcrypto"
 	log "github.com/netsys-lab/qparts/pkg/qplogging"
 	"github.com/netsys-lab/qparts/pkg/qpnet"
+	"github.com/netsys-lab/qparts/pkg/qpproto"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
 	"github.com/scionproto/scion/pkg/snet"
 )
@@ -23,8 +24,8 @@ type ControlPlane struct {
 	dp              *QPartsDataplane
 	Scheduler       *Scheduler
 	ControlConn     *qpnet.SingleStreamQUICConn
-	localHandshake  *QPartsHandshakePacket
-	remoteHandshake *QPartsHandshakePacket
+	localHandshake  *qpproto.QPartsHandshakePacket
+	remoteHandshake *qpproto.QPartsHandshakePacket
 	pConn           *QPartsConn
 }
 
@@ -75,7 +76,7 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 	cp.remote = remote
 
 	// Send handshake
-	hs := NewQPartsHandshakePacket()
+	hs := qpproto.NewQPartsHandshakePacket()
 	hs.ConnId = newConnId()
 	hs.Flags = PARTS_MSG_HS
 	hs.Version = getVersion()
@@ -97,7 +98,7 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 
 	// Await reply
 	for {
-		remoteHs := NewQPartsHandshakePacket()
+		remoteHs := qpproto.NewQPartsHandshakePacket()
 		n, err := cp.ControlConn.ReadAll(remoteHs.Data)
 		if err != nil {
 			return err
@@ -131,7 +132,7 @@ func (cp *ControlPlane) ListenAndAccept() error {
 
 	// Receive handshake
 	for {
-		remoteHs := NewQPartsHandshakePacket()
+		remoteHs := qpproto.NewQPartsHandshakePacket()
 		n, err := cp.ControlConn.ReadAll(remoteHs.Data)
 		if err != nil {
 			return err
@@ -144,7 +145,7 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		log.Log.Info("Count ", n)
 
 		// Send handshake back
-		hs := NewQPartsHandshakePacket()
+		hs := qpproto.NewQPartsHandshakePacket()
 		hs.ConnId = newConnId()
 		hs.Flags = PARTS_MSG_HS
 		hs.Version = getVersion()
@@ -190,7 +191,7 @@ func (cp *ControlPlane) readLoop() error {
 		switch flags {
 		case PARTS_MSG_STREAM_HS:
 			// Read stream handshake
-			p := NewQPartsNewStreamPacket()
+			p := qpproto.NewQPartsNewStreamPacket()
 			n, err := cp.ControlConn.ReadAll(p.Data[4:])
 			if err != nil {
 				panic(err)
@@ -244,7 +245,7 @@ func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
 		ReadBuffer: qpnet.NewPacketBuffer(),
 	}
 
-	p := NewQPartsNewStreamPacket()
+	p := qpproto.NewQPartsNewStreamPacket()
 	p.StreamId = s.Id
 	p.Flags = PARTS_MSG_STREAM_HS
 	p.Encode()

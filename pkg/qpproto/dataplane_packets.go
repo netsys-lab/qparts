@@ -1,4 +1,4 @@
-package qparts
+package qpproto
 
 import "encoding/binary"
 

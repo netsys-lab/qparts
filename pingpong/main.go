@@ -56,6 +56,7 @@ func main() {
 			}
 
 			fmt.Println("Received ", n, " bytes via stream")
+			fmt.Println(string(buf))
 		}
 
 		// }
@@ -86,6 +87,7 @@ func main() {
 				}
 
 				fmt.Println("Received ", n, " bytes via stream")
+				fmt.Println(string(buf))
 			}
 		}()
 

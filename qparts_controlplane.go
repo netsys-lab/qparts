@@ -214,7 +214,7 @@ func (cp *ControlPlane) readLoop() error {
 				Id: p.StreamId,
 				// scheduler:  cp.Scheduler,
 				conn:       cp.pConn,
-				ReadBuffer: NewPacketBuffer(1024),
+				ReadBuffer: NewPacketBuffer(),
 			}
 			cp.NewStreamChan <- s
 			fmt.Println("Received new stream handshake")
@@ -238,7 +238,7 @@ func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
 		Id: newConnId(),
 		// scheduler:  cp.Scheduler,
 		conn:       cp.pConn,
-		ReadBuffer: NewPacketBuffer(1024),
+		ReadBuffer: NewPacketBuffer(),
 	}
 
 	p := NewQPartsNewStreamPacket()

@@ -27,8 +27,10 @@ const (
 )
 
 type QPartsDataplane struct {
-	Streams   map[uint64]*QPartsDataplaneStream
-	scheduler *Scheduler
+	Streams         map[uint64]*QPartsDataplaneStream
+	QPartsStreams   map[uint64]*PartsStream
+	scheduler       *Scheduler
+	completionStore *CompletionStore
 }
 
 type QPartsDataplaneStream struct {
@@ -37,10 +39,12 @@ type QPartsDataplaneStream struct {
 	PartsPath *PartsPath
 }
 
-func NewQPartsDataplane(scheduler *Scheduler) *QPartsDataplane {
+func NewQPartsDataplane(scheduler *Scheduler, partsStreams map[uint64]*PartsStream) *QPartsDataplane {
 	return &QPartsDataplane{
-		Streams:   make(map[uint64]*QPartsDataplaneStream),
-		scheduler: scheduler,
+		Streams:         make(map[uint64]*QPartsDataplaneStream),
+		scheduler:       scheduler,
+		QPartsStreams:   partsStreams,
+		completionStore: NewCompletionStore(),
 	}
 }
 
@@ -88,16 +92,22 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 	fmt.Println("Writing to stream ", id)
 	var wg sync.WaitGroup
 
-	for _, dataAssignment := range schedulingDecision.Assignments {
+	compl := dp.completionStore.NewSequenceCompletionFromSchedulingDecision(id, schedulingDecision)
+	dp.completionStore.AddCompletion(compl)
+
+	// TODO: Move to queue based approach for all streams?
+	for i, dataAssignment := range schedulingDecision.Assignments {
 		wg.Add(1)
-		go func(dataAssignment DataAssignment) {
+		go func(dataAssignment DataAssignment, i int) {
 			partsDatapacket := NewQPartsDataplanePacket()
 			partsDatapacket.Flags = PARTS_MSG_DATA
 			partsDatapacket.StreamId = id
-			partsDatapacket.PartId = 1
-			partsDatapacket.FrameId = 1
+			partsDatapacket.SequenceId = compl.SequenceId
+			partsDatapacket.PartId = uint64(i)
+			partsDatapacket.SequenceSize = compl.SequenceSize
+			partsDatapacket.NumParts = uint64(len(schedulingDecision.Assignments))
 
-			partsDatapacket.FrameSize = uint64(len(dataAssignment.Data))
+			partsDatapacket.PartSize = uint64(len(dataAssignment.Data))
 			partsDatapacket.Encode()
 
 			n, err := dataAssignment.DataplaneStream.ssqc.WriteAll(partsDatapacket.Data)
@@ -120,8 +130,10 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 
 			fmt.Printf("Sent %x on Stream %d\n", sha256.Sum256(dataAssignment.Data), id)
 			wg.Done()
-		}(dataAssignment)
+		}(dataAssignment, i)
 	}
+
+	dp.completionStore.RemoveCompletion(compl.SequenceId)
 
 	wg.Wait()
 	return 0, nil
@@ -187,16 +199,30 @@ func (dp *QPartsDataplane) readLoop() error {
 				}
 
 				partsDatapacket.Decode()
+
+				compl := dp.completionStore.GetOrCreateSequenceCompletion(partsDatapacket.StreamId, partsDatapacket.SequenceId, partsDatapacket.NumParts, partsDatapacket.SequenceSize)
+
 				// fmt.Println("Received: ", partsDatapacket)
 				// fmt.Println("On stream ", streamId)
 
-				data := make([]byte, partsDatapacket.FrameSize)
+				data := make([]byte, partsDatapacket.PartSize)
 				n, err = stream.ssqc.ReadAll(data)
 				if err != nil {
 					panic(err)
 				}
 				if n <= 0 {
 					panic("No data received")
+				}
+
+				compl.AddPart(int(partsDatapacket.PartId), data)
+				fmt.Println("Received: ", partsDatapacket)
+				fmt.Println(compl.IsComplete())
+				fmt.Println("Having ", compl.CompletedParts, " / ", compl.Parts)
+				if compl.IsComplete() {
+					// TODO: Access QPARTSStream Here
+					s := dp.QPartsStreams[partsDatapacket.StreamId]
+					s.ReadBuffer.Append(compl.Data)
+					dp.completionStore.RemoveCompletion(partsDatapacket.SequenceId)
 				}
 
 				fmt.Printf("Received %x on stream %d\n", sha256.Sum256(data), streamId)

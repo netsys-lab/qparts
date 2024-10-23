@@ -1,9 +1,6 @@
 package qparts
 
-import (
-	"sync/atomic"
-)
-
+/*
 // RingBuffer is a high-performance ring buffer using atomic operations.
 type PacketBuffer struct {
 	buffer  [][]byte
@@ -61,7 +58,7 @@ func (rb *PacketBuffer) Size() uint64 {
 	return atomic.LoadUint64(&rb.entries)
 }
 
-/*
+
 // PacketBuffer is a thread-safe structure for storing packets.
 type PacketBuffer struct {
 	lock     sync.Mutex

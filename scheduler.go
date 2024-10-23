@@ -1,12 +1,13 @@
 package qparts
 
 import (
+	"github.com/netsys-lab/qparts/pkg/qpnet"
 	"github.com/scionproto/scion/pkg/snet"
 )
 
 type IScheduler interface {
 	ScheduleWrite(data []byte, stream *PartsStream) SchedulingDecision
-	OnCongestionEvent(event *CongestionEvent) error
+	OnCongestionEvent(event *qpnet.CongestionEvent) error
 }
 
 type Scheduler struct {
@@ -28,7 +29,7 @@ type SchedulingDecision struct {
 
 type SchedulerPlugin interface {
 	ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision
-	OnCongestionEvent(event *CongestionEvent) error
+	OnCongestionEvent(event *qpnet.CongestionEvent) error
 }
 
 func NewScheduler() *Scheduler {
@@ -42,7 +43,7 @@ func NewScheduler() *Scheduler {
 	return s
 }
 
-func (s *Scheduler) OnCongestionEvent(event *CongestionEvent) error {
+func (s *Scheduler) OnCongestionEvent(event *qpnet.CongestionEvent) error {
 	return s.activePlugin.OnCongestionEvent(event)
 }
 

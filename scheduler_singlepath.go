@@ -1,5 +1,7 @@
 package qparts
 
+import "github.com/netsys-lab/qparts/pkg/qpnet"
+
 type SchedulerSinglePath struct {
 	index int
 }
@@ -10,7 +12,7 @@ func NewSchedulerSinglePath() *SchedulerSinglePath {
 	}
 }
 
-func (sr *SchedulerSinglePath) OnCongestionEvent(event *CongestionEvent) error {
+func (sr *SchedulerSinglePath) OnCongestionEvent(event *qpnet.CongestionEvent) error {
 	return nil
 }
 

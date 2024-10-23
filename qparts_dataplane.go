@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+
+	"github.com/netsys-lab/qparts/pkg/qpnet"
+	"github.com/netsys-lab/qparts/pkg/qpscion"
 )
 
 const (
@@ -34,9 +37,9 @@ type QPartsDataplane struct {
 }
 
 type QPartsDataplaneStream struct {
-	ssqc *SingleStreamQUICConn
+	ssqc *qpnet.SingleStreamQUICConn
 	// path      snet.DataplanePath
-	PartsPath *PartsPath
+	PartsPath *qpscion.PartsPath
 }
 
 func NewQPartsDataplane(scheduler *Scheduler, partsStreams map[uint64]*PartsStream) *QPartsDataplane {
@@ -52,7 +55,7 @@ func (dp *QPartsDataplane) GetStream(id uint64) *QPartsDataplaneStream {
 	return dp.Streams[id]
 }
 
-func (dp *QPartsDataplane) AddDialStream(id uint64, ssqc *SingleStreamQUICConn, path *PartsPath) error {
+func (dp *QPartsDataplane) AddDialStream(id uint64, ssqc *qpnet.SingleStreamQUICConn, path *qpscion.PartsPath) error {
 	dp.Streams[id] = &QPartsDataplaneStream{
 		ssqc:      ssqc,
 		PartsPath: path,
@@ -69,7 +72,7 @@ func (dp *QPartsDataplane) ScheduleWrite(data []byte, stream *PartsStream) Sched
 	return dp.scheduler.ScheduleWrite(data, stream, dp.Streams)
 }
 
-func (dp *QPartsDataplane) AddListenStream(id uint64, ssqc *SingleStreamQUICConn) error {
+func (dp *QPartsDataplane) AddListenStream(id uint64, ssqc *qpnet.SingleStreamQUICConn) error {
 	dp.Streams[id] = &QPartsDataplaneStream{
 		ssqc: ssqc,
 	}

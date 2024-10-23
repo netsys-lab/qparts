@@ -1,13 +1,16 @@
 package qparts
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"math/rand"
 	"sync"
 
+	"github.com/netsys-lab/qparts/pkg/qpcrypto"
+	log "github.com/netsys-lab/qparts/pkg/qplogging"
+	"github.com/netsys-lab/qparts/pkg/qpnet"
+	"github.com/netsys-lab/qparts/pkg/qpscion"
 	"github.com/scionproto/scion/pkg/snet"
 )
 
@@ -19,7 +22,7 @@ type ControlPlane struct {
 	remote          *snet.UDPAddr
 	dp              *QPartsDataplane
 	Scheduler       *Scheduler
-	ControlConn     *SingleStreamQUICConn
+	ControlConn     *qpnet.SingleStreamQUICConn
 	localHandshake  *QPartsHandshakePacket
 	remoteHandshake *QPartsHandshakePacket
 	pConn           *QPartsConn
@@ -34,13 +37,13 @@ func NewQPartsControlPlane(local *snet.UDPAddr, streams map[uint64]*PartsStream,
 		NewStreamChan: make(chan *PartsStream),
 		pConn:         pconn,
 		Scheduler:     NewScheduler(),
-		ControlConn:   NewSingleStreamQUICConn(getCertificateFunc),
+		ControlConn:   qpnet.NewSingleStreamQUICConn(getCertificateFunc),
 	}
 }
 
 // TODO: Move to additional file
 func getCertificateFunc(local *snet.UDPAddr) ([]tls.Certificate, error) {
-	certs := MustGenerateSelfSignedCert()
+	certs := qpcrypto.MustGenerateSelfSignedCert()
 	return certs, nil
 }
 
@@ -55,14 +58,14 @@ func getVersion() uint64 {
 
 func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 
-	h := host()
-	paths, err := h.queryPaths(context.Background(), remote.IA)
+	paths, err := qpscion.QueryPaths(remote.IA)
+	// paths, err := h.queryPaths(context.Background(), remote.IA)
 	if err != nil {
 		return err
 	}
 
 	rAddr := remote.Copy()
-	rAddr.Path = paths[0].Dataplane()
+	rAddr.Path = paths[0].Internal.Dataplane()
 
 	err = cp.ControlConn.DialAndOpen(cp.local, rAddr)
 	if err != nil {
@@ -82,15 +85,15 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 
 	cp.localHandshake = hs
 
-	Log.Info("Remote CP: ", cp.remote.String())
+	log.Log.Info("Remote CP: ", cp.remote.String())
 
 	n, err := cp.ControlConn.WriteAll(hs.Data)
 	if err != nil {
 		return err
 	}
 
-	Log.Info("Sent new stream handshake")
-	Log.Info("Count ", n)
+	log.Log.Info("Sent new stream handshake")
+	log.Log.Info("Count ", n)
 
 	// Await reply
 	for {
@@ -102,8 +105,8 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 
 		remoteHs.Decode()
 		cp.remoteHandshake = remoteHs
-		Log.Info("Got reply handshake")
-		Log.Info("Count ", n)
+		log.Log.Info("Got reply handshake")
+		log.Log.Info("Count ", n)
 
 		cp.RaceDialDataplaneStreams()
 		fmt.Println("Done racing")
@@ -137,8 +140,8 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		remoteHs.Decode()
 		cp.remoteHandshake = remoteHs
 
-		Log.Info("Got incoming handshake")
-		Log.Info("Count ", n)
+		log.Log.Info("Got incoming handshake")
+		log.Log.Info("Count ", n)
 
 		// Send handshake back
 		hs := NewQPartsHandshakePacket()
@@ -152,12 +155,12 @@ func (cp *ControlPlane) ListenAndAccept() error {
 
 		remote := cp.ControlConn.RemoteAddr()
 		cp.remote = remote
-		Log.Info("Remote CP: ", cp.remote.String())
+		log.Log.Info("Remote CP: ", cp.remote.String())
 
 		go func() {
 			n2, err := cp.ControlConn.WriteAll(hs.Data)
-			Log.Info("Sent reply stream handshake")
-			Log.Info("Count ", n2)
+			log.Log.Info("Sent reply stream handshake")
+			log.Log.Info("Count ", n2)
 			if err != nil {
 				panic(err)
 			}
@@ -214,7 +217,7 @@ func (cp *ControlPlane) readLoop() error {
 				Id: p.StreamId,
 				// scheduler:  cp.Scheduler,
 				conn:       cp.pConn,
-				ReadBuffer: NewPacketBuffer(),
+				ReadBuffer: qpnet.NewPacketBuffer(),
 			}
 			cp.NewStreamChan <- s
 			fmt.Println("Received new stream handshake")
@@ -238,7 +241,7 @@ func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
 		Id: newConnId(),
 		// scheduler:  cp.Scheduler,
 		conn:       cp.pConn,
-		ReadBuffer: NewPacketBuffer(),
+		ReadBuffer: qpnet.NewPacketBuffer(),
 	}
 
 	p := NewQPartsNewStreamPacket()
@@ -273,14 +276,14 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 		wg.Add(1)
 		go func(i int) {
 			// TODO: Might be a different getCertificateFunc
-			ssqc := NewSingleStreamQUICConn(getCertificateFunc)
+			ssqc := qpnet.NewSingleStreamQUICConn(getCertificateFunc)
 			dpStreamId := newConnId()
 			local := cp.local.Copy()
 			local.Host.Port = int(cp.localHandshake.StartPortRange) + i
 			remote := cp.remote.Copy()
 			remote.Host.Port = int(cp.remoteHandshake.StartPortRange) + i
 
-			paths, err := QueryPaths(remote.IA)
+			paths, err := qpscion.QueryPaths(remote.IA)
 			// TODO: ErrGroup
 			if err != nil {
 				panic(err)
@@ -330,7 +333,7 @@ func (cp *ControlPlane) RaceListenDataplaneStreams() error {
 		wg.Add(1)
 		go func(i int) {
 			// TODO: Might be a different getCertificateFunc
-			ssqc := NewSingleStreamQUICConn(getCertificateFunc)
+			ssqc := qpnet.NewSingleStreamQUICConn(getCertificateFunc)
 
 			local := cp.local.Copy()
 			local.Host.Port = int(cp.localHandshake.StartPortRange) + i

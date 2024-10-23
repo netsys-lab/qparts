@@ -1,5 +1,6 @@
 package qparts
 
+/*
 import "fmt"
 
 type SchedulerRoundRobin struct {
@@ -38,3 +39,4 @@ func (sr *SchedulerRoundRobin) ScheduleWrite(data []byte, stream *PartsStream, s
 		Assignments: []DataAssignment{da},
 	}
 }
+*/

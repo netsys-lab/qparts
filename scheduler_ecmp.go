@@ -1,5 +1,6 @@
 package qparts
 
+/*
 type SchedulerECMP struct {
 	index int
 }
@@ -34,3 +35,4 @@ func (sr *SchedulerECMP) ScheduleWrite(data []byte, stream *PartsStream, state *
 		Assignments: []DataAssignment{da},
 	}
 }
+*/

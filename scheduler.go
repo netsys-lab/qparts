@@ -16,9 +16,10 @@ type Scheduler struct {
 
 // We need to have the internal stream id here
 type DataAssignment struct {
-	Path   *PartsPath
-	Data   []byte
-	Remote *snet.UDPAddr
+	// Path   *PartsPath
+	DataplaneStream *QPartsDataplaneStream
+	Data            []byte
+	Remote          *snet.UDPAddr
 }
 
 type SchedulingDecision struct {
@@ -26,7 +27,7 @@ type SchedulingDecision struct {
 }
 
 type SchedulerPlugin interface {
-	ScheduleWrite(data []byte, stream *PartsStream, state *NetworkState) SchedulingDecision
+	ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision
 	OnCongestionEvent(event *CongestionEvent) error
 }
 
@@ -51,9 +52,9 @@ func (s *Scheduler) ActivatePlugin(p SchedulerPlugin) {
 	s.activePlugin = p
 }
 
-func (s *Scheduler) ScheduleWrite(data []byte, stream *PartsStream) SchedulingDecision {
+func (s *Scheduler) ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision {
 	// TODO: State
 	//Log.Info("Scheduling write, active plugin")
 	//Log.Info(s.activePlugin)
-	return s.activePlugin.ScheduleWrite(data, stream, State)
+	return s.activePlugin.ScheduleWrite(data, stream, dpStreams)
 }

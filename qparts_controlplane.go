@@ -105,9 +105,8 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 		Log.Info("Got reply handshake")
 		Log.Info("Count ", n)
 
-		go func() {
-			cp.RaceDialDataplaneStreams()
-		}()
+		cp.RaceDialDataplaneStreams()
+		fmt.Println("Done racing")
 
 		break
 	}
@@ -156,16 +155,16 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		Log.Info("Remote CP: ", cp.remote.String())
 
 		go func() {
-			cp.RaceListenDataplaneStreams()
+			n2, err := cp.ControlConn.WriteAll(hs.Data)
+			Log.Info("Sent reply stream handshake")
+			Log.Info("Count ", n2)
+			if err != nil {
+				panic(err)
+			}
 		}()
 
-		n2, err := cp.ControlConn.WriteAll(hs.Data)
-		if err != nil {
-			return err
-		}
-
-		Log.Info("Sent reply stream handshake")
-		Log.Info("Count ", n2)
+		cp.RaceListenDataplaneStreams()
+		fmt.Println("Done racing")
 		break
 	}
 	go cp.readLoop()
@@ -212,8 +211,8 @@ func (cp *ControlPlane) readLoop() error {
 			}
 			// TODO: Send this information over control plane conn?
 			s := &PartsStream{
-				Id:         p.StreamId,
-				scheduler:  cp.Scheduler,
+				Id: p.StreamId,
+				// scheduler:  cp.Scheduler,
 				conn:       cp.pConn,
 				ReadBuffer: NewPacketBuffer(1024),
 			}
@@ -236,8 +235,8 @@ func (p *ControlPlane) AcceptStream() (*PartsStream, error) {
 
 func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
 	s := &PartsStream{
-		Id:         newConnId(),
-		scheduler:  cp.Scheduler,
+		Id: newConnId(),
+		// scheduler:  cp.Scheduler,
 		conn:       cp.pConn,
 		ReadBuffer: NewPacketBuffer(1024),
 	}
@@ -281,14 +280,13 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 			remote := cp.remote.Copy()
 			remote.Host.Port = int(cp.remoteHandshake.StartPortRange) + i
 
-			h := host()
-			paths, err := h.queryPaths(context.Background(), remote.IA)
+			paths, err := QueryPaths(remote.IA)
 			// TODO: ErrGroup
 			if err != nil {
 				panic(err)
 			}
 
-			remote.Path = paths[0].Dataplane()
+			remote.Path = paths[0].Internal.Dataplane()
 			err = ssqc.DialAndOpen(local, remote)
 			// TODO: ErrGroup
 			if err != nil {
@@ -311,7 +309,7 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 			fmt.Println("Received: ", string(msg))
 
 			// TODO: DP Handshake here
-			err = cp.dp.AddDialStream(dpStreamId, ssqc, remote.Path)
+			err = cp.dp.AddDialStream(dpStreamId, ssqc, &paths[0])
 			// TODO: ErrGroup
 			if err != nil {
 				panic(err)
@@ -322,7 +320,7 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 	}
 	wg.Wait()
 	fmt.Println("Done waiting")
-	cp.dp.readLoop()
+	go cp.dp.readLoop()
 	return nil
 }
 
@@ -373,6 +371,6 @@ func (cp *ControlPlane) RaceListenDataplaneStreams() error {
 	}
 	wg.Wait()
 	fmt.Println("Done waiting")
-	cp.dp.readLoop()
+	go cp.dp.readLoop()
 	return nil
 }

@@ -1,5 +1,6 @@
 package qparts
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -92,10 +93,10 @@ func (sr *SchedulerSbd) OnCongestionEvent(event *CongestionEvent) error {
 			usedPaths = append(usedPaths, paths[v])
 		}
 
-		/*realCongestedPaths := make([]*PartsPath, 0)
-		for _, v := range congestedPaths {
-			realCongestedPaths = append(realCongestedPaths, paths[v])
-		}*/
+		//realCongestedPaths := make([]*PartsPath, 0)
+		//for _, v := range congestedPaths {
+		//	realCongestedPaths = append(realCongestedPaths, paths[v])
+		//}
 
 		affectedInterfaces := sharedBottleneckDetection(usedPaths, congestedPaths)
 		Log.Info("Affected interfaces", affectedInterfaces)
@@ -158,10 +159,10 @@ func filterPathsByBottlenecks(paths []*PartsPath, bottlenecks []string) []*Parts
 
 	for _, path := range paths {
 		if containsAny(path.Interfaces, bottlenecks) {
-			/*if !bottleneckedPathAdded {
-				filteredPaths = append(filteredPaths, path)
-			}
-			bottleneckedPathAdded = true*/
+			//if !bottleneckedPathAdded {
+			//	filteredPaths = append(filteredPaths, path)
+			//}
+			// bottleneckedPathAdded = true
 		} else {
 			// Keep paths that do not contain all bottleneck interfaces unchanged
 			filteredPaths = append(filteredPaths, path)
@@ -457,3 +458,4 @@ func min(a, b int) int {
 	}
 	return b
 }
+*/

@@ -13,8 +13,8 @@ var _ Conn = (*PartsStream)(nil)
 
 type PartsStream struct {
 	// TODO: Add more fields like preferences, reliable, etc
-	Id         uint64
-	scheduler  *Scheduler
+	Id uint64
+	// scheduler  *Scheduler
 	ReadBuffer *PacketBuffer
 	conn       *QPartsConn
 }
@@ -23,7 +23,7 @@ func NewPartsStream(id uint64, scheduler *Scheduler) *PartsStream {
 	return &PartsStream{
 		Id:         id,
 		ReadBuffer: NewPacketBuffer(1024),
-		scheduler:  scheduler,
+		// scheduler:  scheduler,
 	}
 }
 
@@ -46,7 +46,7 @@ func (s *PartsStream) Read(b []byte) (n int, err error) {
 
 func (s *PartsStream) Write(b []byte) (n int, err error) {
 
-	assignments := s.scheduler.ScheduleWrite(b, s)
+	assignments := s.conn.Dataplane.ScheduleWrite(b, s)
 
 	for i, _ := range assignments.Assignments {
 		assignments.Assignments[i].Remote = s.conn.remote

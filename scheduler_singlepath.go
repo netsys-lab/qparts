@@ -14,7 +14,7 @@ func (sr *SchedulerSinglePath) OnCongestionEvent(event *CongestionEvent) error {
 	return nil
 }
 
-func (sr *SchedulerSinglePath) ScheduleWrite(data []byte, stream *PartsStream, state *NetworkState) SchedulingDecision {
+func (sr *SchedulerSinglePath) ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision {
 	// Log.Info(stream.Conn.remote)
 	/*s := stream.conn.remote.String()
 
@@ -25,9 +25,16 @@ func (sr *SchedulerSinglePath) ScheduleWrite(data []byte, stream *PartsStream, s
 		rem = state.Remotes[s]
 	}*/
 
+	var s *QPartsDataplaneStream
+	for _, p := range dpStreams {
+		s = p
+		break
+	}
+
 	da := DataAssignment{
 		// Path: rem.Paths[sr.index],
-		Data: data,
+		DataplaneStream: s, // dpStreams[0],
+		Data:            data,
 	}
 
 	return SchedulingDecision{

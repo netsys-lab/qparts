@@ -3,6 +3,7 @@ package qparts
 import (
 	"context"
 	"crypto/tls"
+	"encoding/binary"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 type ControlPlane struct {
 	ErrChan         chan error
+	NewStreamChan   chan *PartsStream
 	streams         map[uint64]*PartsStream
 	local           *snet.UDPAddr
 	remote          *snet.UDPAddr
@@ -25,13 +27,14 @@ type ControlPlane struct {
 
 func NewQPartsControlPlane(local *snet.UDPAddr, streams map[uint64]*PartsStream, dp *QPartsDataplane, pconn *QPartsConn) *ControlPlane {
 	return &ControlPlane{
-		ErrChan:     make(chan error),
-		streams:     streams,
-		local:       local,
-		dp:          dp,
-		pConn:       pconn,
-		Scheduler:   NewScheduler(),
-		ControlConn: NewSingleStreamQUICConn(getCertificateFunc),
+		ErrChan:       make(chan error),
+		streams:       streams,
+		local:         local,
+		dp:            dp,
+		NewStreamChan: make(chan *PartsStream),
+		pConn:         pconn,
+		Scheduler:     NewScheduler(),
+		ControlConn:   NewSingleStreamQUICConn(getCertificateFunc),
 	}
 }
 
@@ -88,9 +91,6 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 
 	Log.Info("Sent new stream handshake")
 	Log.Info("Count ", n)
-	if err != nil {
-		return err
-	}
 
 	// Await reply
 	for {
@@ -109,8 +109,11 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 			cp.RaceDialDataplaneStreams()
 		}()
 
-		return nil
+		break
 	}
+
+	go cp.readLoop()
+	return nil
 
 }
 
@@ -165,31 +168,103 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		Log.Info("Count ", n2)
 		break
 	}
+	go cp.readLoop()
 	return nil
+}
+
+func (cp *ControlPlane) readLoop() error {
+	for {
+		header := make([]byte, 4)
+		n, err := cp.ControlConn.ReadAll(header)
+		if err != nil {
+			panic(err)
+		}
+
+		if n <= 0 {
+			panic("No data received")
+		}
+
+		flags := binary.BigEndian.Uint32(header)
+		switch flags {
+		case PARTS_MSG_STREAM_HS:
+			// Read stream handshake
+			p := NewQPartsNewStreamPacket()
+			n, err := cp.ControlConn.ReadAll(p.Data[4:])
+			if err != nil {
+				panic(err)
+			}
+
+			if n <= 0 {
+				panic("No data received")
+			}
+
+			copy(p.Data, header)
+			p.Decode()
+
+			// TODO: May negotiate stream parameters here
+			n2, err := cp.ControlConn.WriteAll(p.Data)
+			if err != nil {
+				panic(err)
+			}
+
+			if n2 <= 0 {
+				panic("No data sent")
+			}
+			// TODO: Send this information over control plane conn?
+			s := &PartsStream{
+				Id:         p.StreamId,
+				scheduler:  cp.Scheduler,
+				conn:       cp.pConn,
+				ReadBuffer: NewPacketBuffer(1024),
+			}
+			cp.NewStreamChan <- s
+			fmt.Println("Received new stream handshake")
+
+			break
+		}
+	}
 }
 
 func (p *ControlPlane) AcceptStream() (*PartsStream, error) {
 
-	// TODO: Send this information over control plane conn?
-	s := &PartsStream{
-		Id:         newConnId(),
-		scheduler:  p.Scheduler,
-		conn:       p.pConn,
-		ReadBuffer: NewPacketBuffer(1024),
-	}
+	s := <-p.NewStreamChan
 	p.streams[s.Id] = s
+	fmt.Println("Accepted stream with id ", s.Id)
 
 	return s, nil
 }
 
-func (p *ControlPlane) OpenStream() (*PartsStream, error) {
+func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
 	s := &PartsStream{
 		Id:         newConnId(),
-		scheduler:  p.Scheduler,
-		conn:       p.pConn,
+		scheduler:  cp.Scheduler,
+		conn:       cp.pConn,
 		ReadBuffer: NewPacketBuffer(1024),
 	}
-	p.streams[s.Id] = s
+
+	p := NewQPartsNewStreamPacket()
+	p.StreamId = s.Id
+	p.Flags = PARTS_MSG_STREAM_HS
+	p.Encode()
+
+	n, err := cp.ControlConn.WriteAll(p.Data)
+	if err != nil {
+		panic(err)
+	}
+	if n <= 0 {
+		panic("No data sent")
+	}
+
+	n2, err := cp.ControlConn.ReadAll(p.Data)
+	if err != nil {
+		panic(err)
+	}
+	if n2 <= 0 {
+		panic("No data received")
+	}
+
+	// TODO: May negotiate stream parameters here
+	fmt.Println("Opened stream with id ", s.Id)
 	return s, nil
 }
 

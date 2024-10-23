@@ -11,11 +11,13 @@ import (
 )
 
 const (
-	PARTS_MSG_DATA   = 1 // Data packet
-	PARTS_MSG_HS     = 2 // Handshake packet
-	PARTS_MSG_ACK    = 3 // Data Acknowledgement packet
-	PARTS_MSG_RT     = 4 // Retransfer packet
-	PARTS_MSG_ACK_CT = 5 // Control Plane Acknowledgement packet
+	PARTS_MSG_DATA            = 1 // Data packet
+	PARTS_MSG_HS              = 2 // Handshake packet
+	PARTS_MSG_ACK             = 3 // Data Acknowledgement packet
+	PARTS_MSG_RT              = 4 // Retransfer packet
+	PARTS_MSG_ACK_CT          = 5 // Control Plane Acknowledgement packet
+	PARTS_MSG_STREAM_HS       = 6 // Handshake packet for QPartsStream
+	PARTS_MSG_STREAM_PROPERTY = 7 // Data packet for QPartsStream
 )
 
 const (

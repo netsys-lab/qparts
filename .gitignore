@@ -1,3 +1,4 @@
 examples/quictest/quictest
 examples/pingpong/pingpong
 examples/filetransfer/filetransfer
+examples/fileserver/fileserver

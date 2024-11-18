@@ -7,6 +7,22 @@ import (
 	"github.com/netsys-lab/qparts/pkg/qpnet"
 )
 
+const (
+	/*
+	 * Optimize for latency
+	 */
+	QPARTS_STREAM_PREFERENCE_LATENCY = 1
+	/*
+	 * Optimize for throughput
+	 */
+	QPARTS_STREAM_PREFERENCE_THROUGHPUT = 1
+
+	/*
+	 * Optimize for fairness, use longer and usually unused paths
+	 */
+	QPARTS_STREAM_PREFERENCE_FAIRNESS = 1
+)
+
 type Conn interface {
 	net.Conn
 }
@@ -19,6 +35,7 @@ type PartsStream struct {
 	// scheduler  *Scheduler
 	ReadBuffer *qpnet.PacketBuffer
 	conn       *QPartsConn
+	Preference uint32
 }
 
 func NewPartsStream(id uint64, scheduler *Scheduler) *PartsStream {
@@ -27,6 +44,16 @@ func NewPartsStream(id uint64, scheduler *Scheduler) *PartsStream {
 		ReadBuffer: qpnet.NewPacketBuffer(),
 		// scheduler:  scheduler,
 	}
+}
+
+func (s *PartsStream) SetPreference(preference uint32) error {
+
+	err := s.conn.ControlPlane.ChangeStreamPreference(s, preference)
+	if err != nil {
+		return err
+	}
+	s.Preference = preference
+	return nil
 }
 
 func (s *PartsStream) Read(b []byte) (n int, err error) {

@@ -2,11 +2,13 @@ package qparts
 
 import (
 	"github.com/netsys-lab/qparts/pkg/qpnet"
+	"github.com/netsys-lab/qparts/pkg/qpscion"
 	"github.com/scionproto/scion/pkg/snet"
 )
 
 type IScheduler interface {
-	ScheduleWrite(data []byte, stream *PartsStream) SchedulingDecision
+	ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision
+	InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error)
 	OnCongestionEvent(event *qpnet.CongestionEvent) error
 }
 
@@ -29,6 +31,7 @@ type SchedulingDecision struct {
 
 type SchedulerPlugin interface {
 	ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision
+	InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error)
 	OnCongestionEvent(event *qpnet.CongestionEvent) error
 }
 
@@ -38,7 +41,7 @@ func NewScheduler() *Scheduler {
 	}
 
 	// s.ActivatePlugin(NewSchedulerRoundRobin())
-	s.ActivatePlugin(NewSchedulerSinglePath())
+	s.ActivatePlugin(NewSchedulerECMP())
 
 	return s
 }
@@ -58,4 +61,9 @@ func (s *Scheduler) ScheduleWrite(data []byte, stream *PartsStream, dpStreams ma
 	//Log.Info("Scheduling write, active plugin")
 	//Log.Info(s.activePlugin)
 	return s.activePlugin.ScheduleWrite(data, stream, dpStreams)
+}
+
+func (s *Scheduler) InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error) {
+	// Implement the logic for initial path selection here
+	return s.activePlugin.InitialPathSelection(preference, paths)
 }

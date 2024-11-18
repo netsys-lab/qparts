@@ -2,6 +2,7 @@ package qpscion
 
 import (
 	"context"
+	"hash/fnv"
 	"sort"
 	"strings"
 
@@ -9,10 +10,10 @@ import (
 	"github.com/scionproto/scion/pkg/snet"
 )
 
-type PartsPath struct {
+type QPartsPath struct {
 	Internal    snet.Path
 	Interfaces  []string
-	Id          uint32
+	Id          uint64
 	Sorter      string
 	MTU         int
 	PayloadSize int
@@ -34,15 +35,26 @@ func QueryRawPaths(remote addr.IA) ([]snet.Path, error) {
 	return hc.queryPaths(context.Background(), remote)
 }
 
-func QueryPaths(remote addr.IA) ([]PartsPath, error) {
+func stringToUint64(input string) uint64 {
+	// Create a new FNV-1a 64-bit hash function
+	hasher := fnv.New64a()
+
+	// Write the input string to the hash function
+	hasher.Write([]byte(input))
+
+	// Get the uint64 hash value
+	return hasher.Sum64()
+}
+
+func QueryPaths(remote addr.IA) ([]QPartsPath, error) {
 	hc := host()
 	paths, err := hc.queryPaths(context.Background(), remote)
 	if err != nil {
 		return nil, err
 	}
 
-	PartsPaths := make([]PartsPath, 0)
-	for i, path := range paths {
+	PartsPaths := make([]QPartsPath, 0)
+	for _, path := range paths {
 
 		// Print interfaces
 		// Log.Info("Interfaces:")
@@ -50,12 +62,16 @@ func QueryPaths(remote addr.IA) ([]PartsPath, error) {
 		//	Log.Info(intf)
 		//}
 
-		PartsPath := PartsPath{
+		pathSorter := IdFromSnetPath(path)
+		id := stringToUint64(pathSorter)
+
+		PartsPath := QPartsPath{
 			Internal:    path,
 			Interfaces:  InterfacesToIds(path.Metadata().Interfaces),
-			Id:          uint32(i), // IdFromSnetPath(path),
-			MTU:         1472,
-			PayloadSize: 1400,
+			Id:          id,   // IdFromSnetPath(path),
+			MTU:         1472, // TODO: MTU Discovery
+			Sorter:      pathSorter,
+			PayloadSize: 1200, // TODO: Payloadsize
 		}
 		PartsPath.Sorter = strings.Join(PartsPath.Interfaces, ",")
 		PartsPaths = append(PartsPaths, PartsPath)
@@ -76,7 +92,7 @@ func InterfacesToIds(intfs []snet.PathInterface) []string {
 
 // SortPartsPaths sorts a slice of PartsPath structs based on the length of the Sorter string,
 // and then alphabetically by the Sorter string.
-func SortPartsPaths(paths []PartsPath) {
+func SortPartsPaths(paths []QPartsPath) {
 	sort.Slice(paths, func(i, j int) bool {
 		// First compare the length of the Sorter strings
 		if len(paths[i].Sorter) != len(paths[j].Sorter) {
@@ -89,7 +105,7 @@ func SortPartsPaths(paths []PartsPath) {
 
 // SortPartsPaths sorts a slice of PartsPath structs based on the length of the Sorter string,
 // and then alphabetically by the Sorter string.
-func SortPartsPathsP(paths []*PartsPath) {
+func SortPartsPathsP(paths []*QPartsPath) {
 	sort.Slice(paths, func(i, j int) bool {
 		// First compare the length of the Sorter strings
 		if len(paths[i].Sorter) != len(paths[j].Sorter) {

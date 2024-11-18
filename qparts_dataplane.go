@@ -40,7 +40,7 @@ type QPartsDataplane struct {
 type QPartsDataplaneStream struct {
 	ssqc *qpnet.SingleStreamQUICConn
 	// path      snet.DataplanePath
-	PartsPath *qpscion.PartsPath
+	PartsPath *qpscion.QPartsPath
 }
 
 func NewQPartsDataplane(scheduler *Scheduler, partsStreams map[uint64]*PartsStream) *QPartsDataplane {
@@ -56,7 +56,7 @@ func (dp *QPartsDataplane) GetStream(id uint64) *QPartsDataplaneStream {
 	return dp.Streams[id]
 }
 
-func (dp *QPartsDataplane) AddDialStream(id uint64, ssqc *qpnet.SingleStreamQUICConn, path *qpscion.PartsPath) error {
+func (dp *QPartsDataplane) AddDialStream(id uint64, ssqc *qpnet.SingleStreamQUICConn, path *qpscion.QPartsPath) error {
 	dp.Streams[id] = &QPartsDataplaneStream{
 		ssqc:      ssqc,
 		PartsPath: path,

@@ -14,5 +14,6 @@
 - Crypto
 - MTU Discovery and handling
 - Send loop
+- Change path on the fly for optimizedConn
 
 ## Bugs

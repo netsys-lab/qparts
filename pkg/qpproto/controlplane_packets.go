@@ -4,7 +4,7 @@ import "encoding/binary"
 
 func NewQPartsHandshakePacket() *QPartsHandshakePacket {
 	return &QPartsHandshakePacket{
-		Data: make([]byte, 24),
+		Data: make([]byte, 26),
 	}
 }
 
@@ -14,13 +14,14 @@ type QPartsHandshakePacket struct {
 	Version        uint64
 	StartPortRange uint16
 	EndPortRange   uint16
+	NumStreams     uint16
 	Data           []byte
 }
 
 /*
  */
 func (bp *QPartsHandshakePacket) GetHeaderLen() int {
-	return 24
+	return 26
 }
 
 func (packet *QPartsHandshakePacket) Encode() {
@@ -31,6 +32,7 @@ func (packet *QPartsHandshakePacket) Encode() {
 	binary.BigEndian.PutUint64(packet.Data[12:20], packet.Version)
 	binary.BigEndian.PutUint16(packet.Data[20:22], packet.StartPortRange)
 	binary.BigEndian.PutUint16(packet.Data[22:24], packet.EndPortRange)
+	binary.BigEndian.PutUint16(packet.Data[24:26], packet.NumStreams)
 }
 
 func (packet *QPartsHandshakePacket) Decode() {
@@ -40,5 +42,6 @@ func (packet *QPartsHandshakePacket) Decode() {
 	packet.Version = binary.BigEndian.Uint64(packet.Data[12:20])
 	packet.StartPortRange = binary.BigEndian.Uint16(packet.Data[20:22])
 	packet.EndPortRange = binary.BigEndian.Uint16(packet.Data[22:24])
+	packet.NumStreams = binary.BigEndian.Uint16(packet.Data[24:26])
 
 }

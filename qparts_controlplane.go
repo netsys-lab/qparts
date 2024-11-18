@@ -16,17 +16,18 @@ import (
 )
 
 type ControlPlane struct {
-	ErrChan         chan error
-	NewStreamChan   chan *PartsStream
-	streams         map[uint64]*PartsStream
-	local           *snet.UDPAddr
-	remote          *snet.UDPAddr
-	dp              *QPartsDataplane
-	Scheduler       *Scheduler
-	ControlConn     *qpnet.SingleStreamQUICConn
-	localHandshake  *qpproto.QPartsHandshakePacket
-	remoteHandshake *qpproto.QPartsHandshakePacket
-	pConn           *QPartsConn
+	ErrChan              chan error
+	NewStreamChan        chan *PartsStream
+	streams              map[uint64]*PartsStream
+	local                *snet.UDPAddr
+	remote               *snet.UDPAddr
+	dp                   *QPartsDataplane
+	Scheduler            *Scheduler
+	ControlConn          *qpnet.SingleStreamQUICConn
+	localHandshake       *qpproto.QPartsHandshakePacket
+	remoteHandshake      *qpproto.QPartsHandshakePacket
+	pConn                *QPartsConn
+	initialPathSelection []qpscion.QPartsPath
 }
 
 func NewQPartsControlPlane(local *snet.UDPAddr, streams map[uint64]*PartsStream, dp *QPartsDataplane, pconn *QPartsConn) *ControlPlane {
@@ -59,11 +60,18 @@ func getVersion() uint64 {
 
 func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 
-	paths, err := qpscion.QueryPaths(remote.IA)
-	// paths, err := h.queryPaths(context.Background(), remote.IA)
+	paths, err := qpscion.Paths.Get(remote)
 	if err != nil {
 		return err
 	}
+
+	// TODO: Conn Preference?
+	initialPathSelection, err := cp.Scheduler.InitialPathSelection(0, paths)
+	if err != nil {
+		return err
+	}
+
+	cp.initialPathSelection = initialPathSelection
 
 	rAddr := remote.Copy()
 	rAddr.Path = paths[0].Internal.Dataplane()
@@ -82,6 +90,7 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 	hs.Version = getVersion()
 	hs.StartPortRange = 44000
 	hs.EndPortRange = 44010
+	hs.NumStreams = uint16(len(initialPathSelection))
 	hs.Encode()
 
 	cp.localHandshake = hs
@@ -167,7 +176,7 @@ func (cp *ControlPlane) ListenAndAccept() error {
 			}
 		}()
 
-		cp.RaceListenDataplaneStreams()
+		cp.RaceListenDataplaneStreams(int(remoteHs.NumStreams))
 		fmt.Println("Done racing")
 		break
 	}
@@ -215,13 +224,40 @@ func (cp *ControlPlane) readLoop() error {
 			}
 			// TODO: Send this information over control plane conn?
 			s := &PartsStream{
-				Id: p.StreamId,
-				// scheduler:  cp.Scheduler,
+				Id:         p.StreamId,
+				Preference: p.StreamProperty,
 				conn:       cp.pConn,
 				ReadBuffer: qpnet.NewPacketBuffer(),
 			}
 			cp.NewStreamChan <- s
 			fmt.Println("Received new stream handshake")
+			break
+		case PARTS_MSG_STREAM_PROPERTY:
+			// Read stream handshake
+			p := qpproto.NewQPartsNewStreamPacket()
+			n, err := cp.ControlConn.ReadAll(p.Data[4:])
+			if err != nil {
+				panic(err)
+			}
+
+			if n <= 0 {
+				panic("No data received")
+			}
+
+			copy(p.Data, header)
+			p.Decode()
+
+			// TODO: May negotiate stream parameters here
+			n2, err := cp.ControlConn.WriteAll(p.Data)
+			if err != nil {
+				panic(err)
+			}
+
+			if n2 <= 0 {
+				panic("No data sent")
+			}
+			cp.streams[p.StreamId].Preference = p.StreamProperty
+			fmt.Println("Update stream preference")
 
 			break
 		}
@@ -271,11 +307,41 @@ func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
 	return s, nil
 }
 
+func (cp *ControlPlane) ChangeStreamPreference(s *PartsStream, pref uint32) error {
+	p := qpproto.NewQPartsNewStreamPacket()
+	p.StreamId = s.Id
+	p.Flags = PARTS_MSG_STREAM_PROPERTY
+	p.StreamProperty = pref
+	p.Encode()
+
+	n, err := cp.ControlConn.WriteAll(p.Data)
+	if err != nil {
+		panic(err)
+	}
+	if n <= 0 {
+		panic("No data sent")
+	}
+
+	n2, err := cp.ControlConn.ReadAll(p.Data)
+	if err != nil {
+		panic(err)
+	}
+	if n2 <= 0 {
+		panic("No data received")
+	}
+
+	// TODO: May negotiate stream parameters here
+	fmt.Println("Changed stream preference with id ", s.Id)
+	return nil
+}
+
 func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 	var wg sync.WaitGroup
-	for i := 0; i < 3; i++ {
+
+	fmt.Println("Racing streams over ", len(cp.initialPathSelection), " paths")
+	for i, path := range cp.initialPathSelection {
 		wg.Add(1)
-		go func(i int) {
+		go func(i int, path *qpscion.QPartsPath) {
 			// TODO: Might be a different getCertificateFunc
 			ssqc := qpnet.NewSingleStreamQUICConn(getCertificateFunc)
 			dpStreamId := newConnId()
@@ -284,18 +350,14 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 			remote := cp.remote.Copy()
 			remote.Host.Port = int(cp.remoteHandshake.StartPortRange) + i
 
-			paths, err := qpscion.QueryPaths(remote.IA)
+			remote.Path = path.Internal.Dataplane()
+			err := ssqc.DialAndOpen(local, remote)
 			// TODO: ErrGroup
 			if err != nil {
 				panic(err)
 			}
 
-			remote.Path = paths[0].Internal.Dataplane()
-			err = ssqc.DialAndOpen(local, remote)
-			// TODO: ErrGroup
-			if err != nil {
-				panic(err)
-			}
+			ssqc.SetPath(path)
 
 			msg := []byte("Hello from CP")
 			_, err = ssqc.WriteAll(msg)
@@ -313,14 +375,14 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 			fmt.Println("Received: ", string(msg))
 
 			// TODO: DP Handshake here
-			err = cp.dp.AddDialStream(dpStreamId, ssqc, &paths[0])
+			err = cp.dp.AddDialStream(dpStreamId, ssqc, path)
 			// TODO: ErrGroup
 			if err != nil {
 				panic(err)
 			}
 			wg.Done()
 
-		}(i)
+		}(i, &path)
 	}
 	wg.Wait()
 	fmt.Println("Done waiting")
@@ -328,9 +390,10 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 	return nil
 }
 
-func (cp *ControlPlane) RaceListenDataplaneStreams() error {
+func (cp *ControlPlane) RaceListenDataplaneStreams(numStreams int) error {
 	var wg sync.WaitGroup
-	for i := 0; i < 3; i++ {
+	fmt.Println("Racing streams over ", numStreams, " paths")
+	for i := 0; i < numStreams; i++ {
 		wg.Add(1)
 		go func(i int) {
 			// TODO: Might be a different getCertificateFunc

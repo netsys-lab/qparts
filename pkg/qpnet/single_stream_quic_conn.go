@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/netsys-lab/qparts/pkg/qpscion"
 	optimizedconn "github.com/netsys-lab/scion-optimized-connection/pkg"
 
 	"github.com/quic-go/quic-go"
@@ -36,6 +37,8 @@ type SingleStreamQUICConn struct {
 	listener        *quic.Listener
 	certificateFunc GetCertificateFunc
 	optConn         *optimizedconn.OptimizedSCIONConn
+	QTracer         *QPartsQuicTracer
+	Path            *qpscion.QPartsPath
 }
 
 func (ssqc *SingleStreamQUICConn) Close() error {
@@ -69,15 +72,16 @@ func (ssqc *SingleStreamQUICConn) RemoteAddr() *snet.UDPAddr {
 	return ssqc.qconn.RemoteAddr().(*snet.UDPAddr)
 }
 
-// TODO: Not implemented
-func (ssqc *SingleStreamQUICConn) SetPath(path snet.DataplanePath) error {
+// TODO: Set path in optimizedconn
+func (ssqc *SingleStreamQUICConn) SetPath(path *qpscion.QPartsPath) error {
 	// err := ssqc.optConn.SetPath(path)
 	// return err
+	ssqc.Path = path
 	return nil
 }
 
 func NewSingleStreamQUICConn(certificateFunc GetCertificateFunc) *SingleStreamQUICConn {
-	return &SingleStreamQUICConn{certificateFunc: certificateFunc}
+	return &SingleStreamQUICConn{certificateFunc: certificateFunc, QTracer: NewQPartsQuicTracer()}
 }
 
 func (ssqc *SingleStreamQUICConn) ListenAndAccept(local *snet.UDPAddr) error {
@@ -95,7 +99,7 @@ func (ssqc *SingleStreamQUICConn) ListenAndAccept(local *snet.UDPAddr) error {
 		return err
 	}
 
-	listener, err := quic.Listen(pconn, &tls.Config{InsecureSkipVerify: true, Certificates: certs, NextProtos: []string{"qparts"}}, &quic.Config{})
+	listener, err := quic.Listen(pconn, &tls.Config{InsecureSkipVerify: true, Certificates: certs, NextProtos: []string{"qparts"}}, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
 	if err != nil {
 		return err
 	}
@@ -114,6 +118,7 @@ func (ssqc *SingleStreamQUICConn) ListenAndAccept(local *snet.UDPAddr) error {
 		ssqc.qconn = sess
 		ssqc.stream = stream
 		ssqc.listener = listener
+
 		break
 	}
 
@@ -136,7 +141,7 @@ func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote *snet.UDPAddr) error
 
 	pconn := connectedPacketConn{conn}
 
-	session, err := quic.Dial(context.Background(), pconn, rudpAddr, &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"qparts"}}, &quic.Config{})
+	session, err := quic.Dial(context.Background(), pconn, rudpAddr, &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"qparts"}}, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
 	if err != nil {
 		return err
 	}

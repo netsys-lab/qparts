@@ -53,8 +53,10 @@ func main() {
 			log.Fatal(err)
 		}
 
+		fmt.Println(" -------------------------------------- ")
 		fmt.Println("Received ", n, " bytes via stream")
 		fmt.Printf("Hash %x\n", sha256.Sum256(buf))
+		time.Sleep(10 * time.Second)
 
 		// }
 
@@ -108,6 +110,7 @@ func main() {
 			log.Fatal(err)
 		}
 
+		fmt.Println(" -------------------------------------- ")
 		fmt.Printf("Hash %x\n", sha256.Sum256(buf))
 		fmt.Println("Sent ", n, " bytes via stream")
 		time.Sleep(1 * time.Second)

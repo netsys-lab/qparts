@@ -1,6 +1,7 @@
 package qparts
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -66,6 +67,7 @@ func (s *PartsStream) Read(b []byte) (n int, err error) {
 
 	bts := s.ReadBuffer.Read(len(b))
 	n = copy(b, bts)
+	fmt.Println("INTERNAL READ ", n)
 	return n, nil
 }
 

@@ -1,6 +1,9 @@
 package qpnet
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 // PacketBuffer is a structure that holds a buffer of bytes.
 // It supports appending bytes to the buffer and reading/removing bytes from it.
@@ -27,8 +30,10 @@ func (pb *PacketBuffer) Append(data []byte) {
 	// Append the data
 	pb.buffer = append(pb.buffer, data...)
 
+	fmt.Println(" ----------- BEFORE BROADCASTING ----------- ")
 	// Signal all waiting goroutines that data has been appended
 	pb.cond.Broadcast()
+	fmt.Println(" ----------- BROADCASTING ----------- ")
 }
 
 // Read removes up to `n` bytes from the beginning of the buffer and returns them.
@@ -38,6 +43,9 @@ func (pb *PacketBuffer) Read(n int) []byte {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 
+	fmt.Println(" ----------- READING ----------- ")
+	fmt.Println(len(pb.buffer))
+	fmt.Println(" ----------- /READING ----------- ")
 	// Wait until the buffer has some data
 	for len(pb.buffer) == 0 {
 		pb.cond.Wait() // Block until notified that data is available

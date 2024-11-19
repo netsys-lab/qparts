@@ -99,6 +99,8 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 	compl := dp.completionStore.NewSequenceCompletionFromSchedulingDecision(id, schedulingDecision)
 	dp.completionStore.AddCompletion(compl)
 
+	// atomic int
+	sentBytes := 0
 	// TODO: Move to queue based approach for all streams?
 	for i, dataAssignment := range schedulingDecision.Assignments {
 		wg.Add(1)
@@ -132,7 +134,10 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 				panic("No data sent")
 			}
 
-			fmt.Printf("Sent %x on Stream %d\n", sha256.Sum256(dataAssignment.Data), id)
+			fmt.Printf("Copying data %x from %d to %d \n", sha256.Sum256(dataAssignment.Data), i, i+len(dataAssignment.Data))
+
+			fmt.Printf("Sent %x on Stream %d for id %d\n", sha256.Sum256(dataAssignment.Data), id, int(partsDatapacket.PartId))
+			sentBytes += len(dataAssignment.Data)
 			wg.Done()
 		}(dataAssignment, i)
 	}
@@ -140,7 +145,7 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 	dp.completionStore.RemoveCompletion(compl.SequenceId)
 
 	wg.Wait()
-	return 0, nil
+	return sentBytes, nil
 
 	/*for streamId, stream := range dp.Streams {
 		wg.Add(1)
@@ -191,9 +196,11 @@ func (dp *QPartsDataplane) readLoop() error {
 	for streamId, stream := range dp.Streams {
 		wg.Add(1)
 		go func(streamId uint64, stream *QPartsDataplaneStream) {
-
 			for {
 				partsDatapacket := qpproto.NewQPartsDataplanePacket()
+
+				// fmt.Println(partsDatapacket)
+				fmt.Println("Reading ", len(partsDatapacket.Data), " on  stream ", streamId)
 				n, err := stream.ssqc.ReadAll(partsDatapacket.Data)
 				if err != nil {
 					panic(err)
@@ -201,13 +208,19 @@ func (dp *QPartsDataplane) readLoop() error {
 				if n <= 0 {
 					panic("No data received")
 				}
-
 				partsDatapacket.Decode()
 
+				fmt.Println("DECODE")
 				compl := dp.completionStore.GetOrCreateSequenceCompletion(partsDatapacket.StreamId, partsDatapacket.SequenceId, partsDatapacket.NumParts, partsDatapacket.SequenceSize)
 
+				fmt.Println("TESTESTEST")
+				fmt.Printf("Received compl %p %d %d %d %d %d\n\n", compl, compl.StreamId, compl.SequenceId, compl.Parts, compl.SequenceSize, compl.CompletedParts)
+				fmt.Println("TESTESTEST")
 				// fmt.Println("Received: ", partsDatapacket)
 				// fmt.Println("On stream ", streamId)
+
+				fmt.Println("Received: ", partsDatapacket)
+				fmt.Println("With size ", partsDatapacket.PartSize)
 
 				data := make([]byte, partsDatapacket.PartSize)
 				n, err = stream.ssqc.ReadAll(data)
@@ -218,18 +231,23 @@ func (dp *QPartsDataplane) readLoop() error {
 					panic("No data received")
 				}
 
-				compl.AddPart(int(partsDatapacket.PartId), data)
-				fmt.Println("Received: ", partsDatapacket)
-				fmt.Println(compl.IsComplete())
+				isComplete := compl.AddPart(int(partsDatapacket.PartId), data)
+
+				fmt.Println(isComplete)
 				fmt.Println("Having ", compl.CompletedParts, " / ", compl.Parts)
-				if compl.IsComplete() {
+				fmt.Printf("Received %x on stream %d for id %d \n", sha256.Sum256(data), streamId, int(partsDatapacket.PartId))
+				// time.Sleep(3 * time.Second)
+
+				if isComplete {
+					fmt.Println("IS COMPLETE")
 					// TODO: Access QPARTSStream Here
 					s := dp.QPartsStreams[partsDatapacket.StreamId]
-					s.ReadBuffer.Append(compl.Data)
 					dp.completionStore.RemoveCompletion(partsDatapacket.SequenceId)
+
+					s.ReadBuffer.Append(compl.Data)
+					fmt.Println("Completed sequence")
 				}
 
-				fmt.Printf("Received %x on stream %d\n", sha256.Sum256(data), streamId)
 			}
 		}(streamId, stream)
 	}

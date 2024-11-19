@@ -2,7 +2,6 @@ package qpnet
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/netsys-lab/qparts/pkg/qpscion"
 	"github.com/quic-go/quic-go"
@@ -33,11 +32,11 @@ func (qt *QPartsQuicTracer) NewTracerHandler() func(context context.Context, per
 
 		qt.Tracer = &logging.ConnectionTracer{}
 		qt.Tracer.AcknowledgedPacket = func(encLevel logging.EncryptionLevel, packetNumber logging.PacketNumber) {
-			fmt.Println("Acked Packet")
+			// fmt.Println("Acked Packet")
 		}
 		qt.Tracer.LostPacket = func(encLevel logging.EncryptionLevel, packetNumber logging.PacketNumber, reason logging.PacketLossReason) {
-			fmt.Println("Lost Packet")
-			fmt.Println(reason)
+			// fmt.Println("Lost Packet")
+			// fmt.Println(reason)
 		}
 		return qt.Tracer
 	}

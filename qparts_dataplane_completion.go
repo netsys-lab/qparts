@@ -1,6 +1,8 @@
 package qparts
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"math/rand"
 	"sync"
 )
@@ -13,14 +15,29 @@ type QPartsSequenceCompletion struct {
 	SequenceSize   uint64
 	CompletedParts int
 	Data           []byte
+	internalParts  [][]byte
 }
 
-func (sc *QPartsSequenceCompletion) AddPart(index int, data []byte) {
+func (sc *QPartsSequenceCompletion) AddPart(index int, data []byte) bool {
 	sc.Lock()
 	defer sc.Unlock()
+	fmt.Println("Adding part ", index)
 	sc.CompletedParts++
+	sc.internalParts[index] = data
+
 	// Copy into data starting from index
-	copy(sc.Data[index:], data)
+	fmt.Printf("Copying data %x from %d to %d \n", sha256.Sum256(data), index, index+len(data))
+	//
+	compl := sc.IsComplete()
+	if compl {
+		offset := 0
+		for _, part := range sc.internalParts {
+			copy(sc.Data[offset:], part)
+			offset += len(part)
+		}
+		fmt.Printf("COMPLETE Hash %x\n", sha256.Sum256(sc.Data))
+	}
+	return compl
 }
 
 func (sc *QPartsSequenceCompletion) IsComplete() bool {
@@ -63,6 +80,7 @@ func newSequenceId() uint64 {
 func (cs *CompletionStore) GetOrCreateSequenceCompletion(streamId uint64, sequenceId uint64, numParts uint64, sequenceSize uint64) *QPartsSequenceCompletion {
 
 	cs.Lock()
+	fmt.Println("Locking: Getting or creating completion for ", sequenceId)
 	defer cs.Unlock()
 
 	if c, ok := cs.Completions[sequenceId]; ok {
@@ -70,14 +88,16 @@ func (cs *CompletionStore) GetOrCreateSequenceCompletion(streamId uint64, sequen
 	}
 
 	pc := &QPartsSequenceCompletion{
-		StreamId:     streamId,
-		SequenceId:   sequenceId,
-		Parts:        int(numParts),
-		SequenceSize: sequenceSize,
+		StreamId:      streamId,
+		SequenceId:    sequenceId,
+		Parts:         int(numParts),
+		SequenceSize:  sequenceSize,
+		internalParts: make([][]byte, numParts),
 	}
 
 	pc.Data = make([]byte, sequenceSize)
-
+	cs.Completions[sequenceId] = pc
+	fmt.Println("UnLocking: Getting or creating completion for ", sequenceId)
 	return pc
 }
 

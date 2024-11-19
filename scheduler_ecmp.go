@@ -37,6 +37,22 @@ func (sr *SchedulerECMP) ScheduleWrite(data []byte, stream *PartsStream, dpStrea
 
 	// Distribute data over all available dpStreams
 
+	var s *QPartsDataplaneStream
+	for _, p := range dpStreams {
+		s = p
+		break
+	}
+
+	if len(data) <= 1000 {
+		da := DataAssignment{
+			DataplaneStream: s,
+			Data:            data,
+		}
+		return SchedulingDecision{
+			Assignments: []DataAssignment{da},
+		}
+	}
+
 	distribution := splitBytes(data, len(dpStreams))
 
 	assignments := make([]DataAssignment, len(dpStreams))
@@ -89,12 +105,16 @@ func splitBytes(data []byte, n int) [][]byte {
 		start = end
 	}
 
+	for i, p := range parts {
+		fmt.Printf("------------- Part %d: has len %d \n", i, len(p))
+	}
+
 	return parts
 }
 
 func (sr *SchedulerECMP) InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error) {
 	// Implement the logic for initial path selection here
 	fmt.Println("Selecting paths for ECMP")
-	fmt.Println(paths[:1])
-	return paths[:1], nil
+	fmt.Println(paths[:3])
+	return paths[:3], nil
 }

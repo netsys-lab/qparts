@@ -1,11 +1,10 @@
 package qparts
 
 import (
-	"crypto/sha256"
-	"fmt"
 	"math/rand"
 	"sync"
 
+	"github.com/netsys-lab/qparts/pkg/qplogging"
 	"github.com/netsys-lab/qparts/pkg/qpnet"
 	"github.com/netsys-lab/qparts/pkg/qpproto"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
@@ -61,7 +60,7 @@ func (dp *QPartsDataplane) AddDialStream(id uint64, ssqc *qpnet.SingleStreamQUIC
 		ssqc:      ssqc,
 		PartsPath: path,
 	}
-	fmt.Println("Added dial stream")
+	qplogging.Log.Debug("Added dial stream")
 
 	return nil
 }
@@ -77,7 +76,7 @@ func (dp *QPartsDataplane) AddListenStream(id uint64, ssqc *qpnet.SingleStreamQU
 	dp.Streams[id] = &QPartsDataplaneStream{
 		ssqc: ssqc,
 	}
-	fmt.Println("Added listen stream")
+	qplogging.Log.Debug("Added listen stream")
 
 	return nil
 }
@@ -93,7 +92,7 @@ func generateRandomBytes(size int) ([]byte, error) {
 }
 
 func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision, id uint64) (int, error) {
-	fmt.Println("Writing to stream ", id)
+	qplogging.Log.Debug("Writing to stream ", id)
 	var wg sync.WaitGroup
 
 	compl := dp.completionStore.NewSequenceCompletionFromSchedulingDecision(id, schedulingDecision)
@@ -124,7 +123,7 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 			if n <= 0 {
 				panic("No data sent")
 			}
-			// fmt.Println("Sent data packet: ", n)
+			// qplogging.Log.Debug("Sent data packet: ", n)
 
 			n, err = dataAssignment.DataplaneStream.ssqc.WriteAll(dataAssignment.Data)
 			if err != nil {
@@ -134,9 +133,8 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 				panic("No data sent")
 			}
 
-			fmt.Printf("Copying data %x from %d to %d \n", sha256.Sum256(dataAssignment.Data), i, i+len(dataAssignment.Data))
-
-			fmt.Printf("Sent %x on Stream %d for id %d\n", sha256.Sum256(dataAssignment.Data), id, int(partsDatapacket.PartId))
+			// qplogging.Log.Debugf("Copying data %x from %d to %d \n", sha256.Sum256(dataAssignment.Data), i, i+len(dataAssignment.Data))
+			// qplogging.Log.Debugf("Sent %x on Stream %d for id %d\n", sha256.Sum256(dataAssignment.Data), id, int(partsDatapacket.PartId))
 			sentBytes += len(dataAssignment.Data)
 			wg.Done()
 		}(dataAssignment, i)
@@ -158,7 +156,7 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 			partsDatapacket.FrameId = 1
 
 			data, _ := generateRandomBytes(1000000)
-			fmt.Printf("%x\n", sha256.Sum256(data))
+			qplogging.Log.Debugf("%x\n", sha256.Sum256(data))
 
 			partsDatapacket.FrameSize = uint64(len(data))
 			partsDatapacket.Encode()
@@ -171,7 +169,7 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 			if n <= 0 {
 				panic("No data sent")
 			}
-			fmt.Println("Sent data packet: ", n)
+			qplogging.Log.Debug("Sent data packet: ", n)
 
 			n, err = stream.ssqc.WriteAll(data)
 			if err != nil {
@@ -181,8 +179,8 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 				panic("No data sent")
 			}
 
-			fmt.Println("sENT: ", partsDatapacket)
-			fmt.Println("On stream ", streamId)
+			qplogging.Log.Debug("sENT: ", partsDatapacket)
+			qplogging.Log.Debug("On stream ", streamId)
 
 		}(streamId, stream)
 	}*/
@@ -191,7 +189,7 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 
 func (dp *QPartsDataplane) readLoop() error {
 	// TODO: Make it capable of adding/removing streams
-	fmt.Println("Starting read loop")
+	qplogging.Log.Debug("Starting read loop")
 	var wg sync.WaitGroup
 	for streamId, stream := range dp.Streams {
 		wg.Add(1)
@@ -199,8 +197,8 @@ func (dp *QPartsDataplane) readLoop() error {
 			for {
 				partsDatapacket := qpproto.NewQPartsDataplanePacket()
 
-				// fmt.Println(partsDatapacket)
-				fmt.Println("Reading ", len(partsDatapacket.Data), " on  stream ", streamId)
+				// qplogging.Log.Debug(partsDatapacket)
+				qplogging.Log.Debug("Reading ", len(partsDatapacket.Data), " bytes on  stream ", streamId)
 				n, err := stream.ssqc.ReadAll(partsDatapacket.Data)
 				if err != nil {
 					panic(err)
@@ -210,17 +208,10 @@ func (dp *QPartsDataplane) readLoop() error {
 				}
 				partsDatapacket.Decode()
 
-				fmt.Println("DECODE")
 				compl := dp.completionStore.GetOrCreateSequenceCompletion(partsDatapacket.StreamId, partsDatapacket.SequenceId, partsDatapacket.NumParts, partsDatapacket.SequenceSize)
 
-				fmt.Println("TESTESTEST")
-				fmt.Printf("Received compl %p %d %d %d %d %d\n\n", compl, compl.StreamId, compl.SequenceId, compl.Parts, compl.SequenceSize, compl.CompletedParts)
-				fmt.Println("TESTESTEST")
-				// fmt.Println("Received: ", partsDatapacket)
-				// fmt.Println("On stream ", streamId)
-
-				fmt.Println("Received: ", partsDatapacket)
-				fmt.Println("With size ", partsDatapacket.PartSize)
+				//qplogging.Log.Debugf("Received compl %p %d %d %d %d %d\n\n", compl, compl.StreamId, compl.SequenceId, compl.Parts, compl.SequenceSize, compl.CompletedParts)
+				//qplogging.Log.Debug("With size ", partsDatapacket.PartSize)
 
 				data := make([]byte, partsDatapacket.PartSize)
 				n, err = stream.ssqc.ReadAll(data)
@@ -232,20 +223,18 @@ func (dp *QPartsDataplane) readLoop() error {
 				}
 
 				isComplete := compl.AddPart(int(partsDatapacket.PartId), data)
-
-				fmt.Println(isComplete)
-				fmt.Println("Having ", compl.CompletedParts, " / ", compl.Parts)
-				fmt.Printf("Received %x on stream %d for id %d \n", sha256.Sum256(data), streamId, int(partsDatapacket.PartId))
+				qplogging.Log.Debug("Having ", compl.CompletedParts, " / ", compl.Parts, " parts for sequence ", compl.SequenceId)
+				// qplogging.Log.Debugf("Received %x on stream %d for id %d \n", sha256.Sum256(data), streamId, int(partsDatapacket.PartId))
 				// time.Sleep(3 * time.Second)
 
 				if isComplete {
-					fmt.Println("IS COMPLETE")
+
 					// TODO: Access QPARTSStream Here
 					s := dp.QPartsStreams[partsDatapacket.StreamId]
 					dp.completionStore.RemoveCompletion(partsDatapacket.SequenceId)
 
 					s.ReadBuffer.Append(compl.Data)
-					fmt.Println("Completed sequence")
+					qplogging.Log.Debug("Sequence complete: ", compl.SequenceId)
 				}
 
 			}

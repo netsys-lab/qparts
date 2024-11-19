@@ -18,6 +18,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/netsys-lab/qparts/pkg/qplogging"
 	optimizedconn "github.com/netsys-lab/scion-optimized-connection/pkg"
 	"github.com/quic-go/quic-go"
 	"github.com/scionproto/scion/pkg/snet"
@@ -216,7 +217,7 @@ func dial() {
 
 	h := host()
 	paths, err := h.queryPaths(context.Background(), raddr.IA)
-	fmt.Println(paths)
+	qplogging.Log.Debug("", paths)
 
 	raddr.Path = paths[0].Dataplane()
 
@@ -264,7 +265,7 @@ func dial() {
 			panic(err)
 		}
 		n, err := io.CopyN(stream, bytes.NewReader(data), int64(len(data)))
-		fmt.Println("Written ", n, " of ", len(data))
+		qplogging.Log.Debug("Written ", n, " of ", len(data))
 		// _, err = stream.Write(data)
 		if err != nil {
 			panic(err)
@@ -318,7 +319,7 @@ func listen() {
 						if err != nil {
 							panic(err)
 						}
-						fmt.Println("Read Header", n)
+						qplogging.Log.Debug("Read Header", n)
 
 						partsPacket, err := partsPacketPacker.UnpackData(&buf)
 						if err != nil {
@@ -328,14 +329,14 @@ func listen() {
 						if err != nil {
 							panic(err)
 						}
-						fmt.Println("Read Data", n)
+						qplogging.Log.Debug("Read Data", n)
 						/*n, err = stream.Read(buf)
 						if err != nil {
 							panic(err)
 						}*/
 						fmt.Printf("Received %x\n", sha256.Sum256(data[:n]))
-						fmt.Println("---------------------------------")
-						// fmt.Println(string())
+						qplogging.Log.Debug("---------------------------------")
+						// qplogging.Log.Debug(string())
 					}
 
 				}()

@@ -5,7 +5,7 @@
 - Proper number of QUICDataplaneStreams
 - Do proper logging
 - Hide quic go not a udp conn message
-- Return proper numbers of Read/Write from API
+- [x] Return proper numbers of Read/Write from API
 - [x] Communicate paths from conn to QUICDataplaneStream for reverse scheduling
 - Implement Deadline functionalities
 - Stream Types

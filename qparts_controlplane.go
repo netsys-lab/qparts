@@ -3,11 +3,11 @@ package qparts
 import (
 	"crypto/tls"
 	"encoding/binary"
-	"fmt"
 	"math/rand"
 	"sync"
 
 	"github.com/netsys-lab/qparts/pkg/qpcrypto"
+	"github.com/netsys-lab/qparts/pkg/qplogging"
 	log "github.com/netsys-lab/qparts/pkg/qplogging"
 	"github.com/netsys-lab/qparts/pkg/qpnet"
 	"github.com/netsys-lab/qparts/pkg/qpproto"
@@ -95,31 +95,31 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 
 	cp.localHandshake = hs
 
-	log.Log.Info("Remote CP: ", cp.remote.String())
+	log.Log.Debug("Remote CP: ", cp.remote.String())
 
-	n, err := cp.ControlConn.WriteAll(hs.Data)
+	_, err = cp.ControlConn.WriteAll(hs.Data)
 	if err != nil {
 		return err
 	}
 
-	log.Log.Info("Sent new stream handshake")
-	log.Log.Info("Count ", n)
+	log.Log.Debug("Sent new stream handshake")
+	// log.Log.Info("Count ", n)
 
 	// Await reply
 	for {
 		remoteHs := qpproto.NewQPartsHandshakePacket()
-		n, err := cp.ControlConn.ReadAll(remoteHs.Data)
+		_, err := cp.ControlConn.ReadAll(remoteHs.Data)
 		if err != nil {
 			return err
 		}
 
 		remoteHs.Decode()
 		cp.remoteHandshake = remoteHs
-		log.Log.Info("Got reply handshake")
-		log.Log.Info("Count ", n)
+		log.Log.Debug("Got reply handshake")
+		// log.Log.Info("Count ", n)
 
 		cp.RaceDialDataplaneStreams()
-		fmt.Println("Done racing")
+		qplogging.Log.Debug("Done racing")
 
 		break
 	}
@@ -142,7 +142,7 @@ func (cp *ControlPlane) ListenAndAccept() error {
 	// Receive handshake
 	for {
 		remoteHs := qpproto.NewQPartsHandshakePacket()
-		n, err := cp.ControlConn.ReadAll(remoteHs.Data)
+		_, err := cp.ControlConn.ReadAll(remoteHs.Data)
 		if err != nil {
 			return err
 		}
@@ -150,8 +150,8 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		remoteHs.Decode()
 		cp.remoteHandshake = remoteHs
 
-		log.Log.Info("Got incoming handshake")
-		log.Log.Info("Count ", n)
+		log.Log.Debug("Got incoming handshake")
+		// log.Log.Info("Count ", n)
 
 		// Send handshake back
 		hs := qpproto.NewQPartsHandshakePacket()
@@ -165,19 +165,19 @@ func (cp *ControlPlane) ListenAndAccept() error {
 
 		remote := cp.ControlConn.RemoteAddr()
 		cp.remote = remote
-		log.Log.Info("Remote CP: ", cp.remote.String())
+		log.Log.Debug("Remote CP: ", cp.remote.String())
 
 		go func() {
-			n2, err := cp.ControlConn.WriteAll(hs.Data)
-			log.Log.Info("Sent reply stream handshake")
-			log.Log.Info("Count ", n2)
+			_, err := cp.ControlConn.WriteAll(hs.Data)
+			log.Log.Debug("Sent reply stream handshake")
+			// log.Log.Info("Count ", n2)
 			if err != nil {
 				panic(err)
 			}
 		}()
 
 		cp.RaceListenDataplaneStreams(int(remoteHs.NumStreams))
-		fmt.Println("Done racing")
+		qplogging.Log.Debug("Done racing")
 		break
 	}
 	go cp.readLoop()
@@ -230,7 +230,7 @@ func (cp *ControlPlane) readLoop() error {
 				ReadBuffer: qpnet.NewPacketBuffer(),
 			}
 			cp.NewStreamChan <- s
-			fmt.Println("Received new stream handshake")
+			qplogging.Log.Debug("Received new stream handshake")
 			break
 		case PARTS_MSG_STREAM_PROPERTY:
 			// Read stream handshake
@@ -257,7 +257,7 @@ func (cp *ControlPlane) readLoop() error {
 				panic("No data sent")
 			}
 			cp.streams[p.StreamId].Preference = p.StreamProperty
-			fmt.Println("Update stream preference")
+			qplogging.Log.Debug("Update stream preference")
 
 			break
 		}
@@ -268,7 +268,7 @@ func (p *ControlPlane) AcceptStream() (*PartsStream, error) {
 
 	s := <-p.NewStreamChan
 	p.streams[s.Id] = s
-	fmt.Println("Accepted stream with id ", s.Id)
+	qplogging.Log.Debug("Accepted stream with id ", s.Id)
 
 	return s, nil
 }
@@ -303,7 +303,7 @@ func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
 	}
 
 	// TODO: May negotiate stream parameters here
-	fmt.Println("Opened stream with id ", s.Id)
+	qplogging.Log.Debug("Opened stream with id ", s.Id)
 	return s, nil
 }
 
@@ -331,14 +331,14 @@ func (cp *ControlPlane) ChangeStreamPreference(s *PartsStream, pref uint32) erro
 	}
 
 	// TODO: May negotiate stream parameters here
-	fmt.Println("Changed stream preference with id ", s.Id)
+	qplogging.Log.Debug("Changed stream preference with id ", s.Id)
 	return nil
 }
 
 func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 	var wg sync.WaitGroup
 
-	fmt.Println("Racing streams over ", len(cp.initialPathSelection), " paths")
+	qplogging.Log.Debug("Racing streams over ", len(cp.initialPathSelection), " paths")
 	for i, path := range cp.initialPathSelection {
 		wg.Add(1)
 		go func(i int, path *qpscion.QPartsPath) {
@@ -371,8 +371,8 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 				panic(err)
 			}
 
-			fmt.Println("Expected: Hello from CP")
-			fmt.Println("Received: ", string(msg))
+			qplogging.Log.Debug("Expected: Hello from CP")
+			qplogging.Log.Debug("Received: ", string(msg))
 
 			// TODO: DP Handshake here
 			err = cp.dp.AddDialStream(dpStreamId, ssqc, path)
@@ -385,14 +385,14 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 		}(i, &path)
 	}
 	wg.Wait()
-	fmt.Println("Done waiting")
+	qplogging.Log.Debug("Done waiting")
 	go cp.dp.readLoop()
 	return nil
 }
 
 func (cp *ControlPlane) RaceListenDataplaneStreams(numStreams int) error {
 	var wg sync.WaitGroup
-	fmt.Println("Racing streams over ", numStreams, " paths")
+	qplogging.Log.Debug("Racing streams over ", numStreams, " paths")
 	for i := 0; i < numStreams; i++ {
 		wg.Add(1)
 		go func(i int) {
@@ -437,7 +437,7 @@ func (cp *ControlPlane) RaceListenDataplaneStreams(numStreams int) error {
 		}(i)
 	}
 	wg.Wait()
-	fmt.Println("Done waiting")
+	qplogging.Log.Debug("Done waiting")
 	go cp.dp.readLoop()
 	return nil
 }

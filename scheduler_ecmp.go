@@ -1,8 +1,7 @@
 package qparts
 
 import (
-	"fmt"
-
+	"github.com/netsys-lab/qparts/pkg/qplogging"
 	"github.com/netsys-lab/qparts/pkg/qpnet"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
 )
@@ -67,7 +66,7 @@ func (sr *SchedulerECMP) ScheduleWrite(data []byte, stream *PartsStream, dpStrea
 		index++
 	}
 
-	// fmt.Println("Assignments: ", assignments)
+	// qplogging.Log.Debug("Assignments: ", assignments)
 
 	return SchedulingDecision{
 		Assignments: assignments,
@@ -106,7 +105,7 @@ func splitBytes(data []byte, n int) [][]byte {
 	}
 
 	for i, p := range parts {
-		fmt.Printf("------------- Part %d: has len %d \n", i, len(p))
+		qplogging.Log.Debugf("Part %d: has len %d", i, len(p))
 	}
 
 	return parts
@@ -114,7 +113,7 @@ func splitBytes(data []byte, n int) [][]byte {
 
 func (sr *SchedulerECMP) InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error) {
 	// Implement the logic for initial path selection here
-	fmt.Println("Selecting paths for ECMP")
-	fmt.Println(paths[:3])
+	qplogging.Log.Debug("Selecting paths for ECMP")
+	// qplogging.Log.Debug(paths[:3])
 	return paths[:3], nil
 }

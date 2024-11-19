@@ -32,11 +32,11 @@ func (qt *QPartsQuicTracer) NewTracerHandler() func(context context.Context, per
 
 		qt.Tracer = &logging.ConnectionTracer{}
 		qt.Tracer.AcknowledgedPacket = func(encLevel logging.EncryptionLevel, packetNumber logging.PacketNumber) {
-			// fmt.Println("Acked Packet")
+			// qplogging.Log.Debug("Acked Packet")
 		}
 		qt.Tracer.LostPacket = func(encLevel logging.EncryptionLevel, packetNumber logging.PacketNumber, reason logging.PacketLossReason) {
-			// fmt.Println("Lost Packet")
-			// fmt.Println(reason)
+			// qplogging.Log.Debug("Lost Packet")
+			// qplogging.Log.Debug(reason)
 		}
 		return qt.Tracer
 	}
@@ -54,16 +54,16 @@ func (qt *QPartsQuicTracer) SetDestination(dest *snet.UDPAddr) {
 var tracers := map[quic.ConnectionID]QPartsQuicTracer{}
 conf := quic.Config{
 	Tracer: func(context context.Context, perspective logging.Perspective, connectionID quic.ConnectionID) *logging.ConnectionTracer {
-		fmt.Println("Obtain Tracer")
+		qplogging.Log.Debug("Obtain Tracer")
 		t := QPartsQuicTracer{}
 
 		tracer := &logging.ConnectionTracer{}
 		tracer.AcknowledgedPacket = func(encLevel logging.EncryptionLevel, packetNumber logging.PacketNumber) {
-			fmt.Println("Acked Packet")
+			qplogging.Log.Debug("Acked Packet")
 		}
 		tracer.LostPacket = func(encLevel logging.EncryptionLevel, packetNumber logging.PacketNumber, reason logging.PacketLossReason) {
-			fmt.Println("Lost Packet")
-			fmt.Println(reason)
+			qplogging.Log.Debug("Lost Packet")
+			qplogging.Log.Debug(reason)
 		}
 		t.Tracer = *tracer
 		t.Context = context

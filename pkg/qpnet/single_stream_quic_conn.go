@@ -98,7 +98,8 @@ func (ssqc *SingleStreamQUICConn) ListenAndAccept(local *snet.UDPAddr) error {
 	if err != nil {
 		return err
 	}
-
+	silenceLog()
+	defer unsilenceLog()
 	listener, err := quic.Listen(pconn, &tls.Config{InsecureSkipVerify: true, Certificates: certs, NextProtos: []string{"qparts"}}, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
 	if err != nil {
 		return err
@@ -140,7 +141,8 @@ func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote *snet.UDPAddr) error
 	}
 
 	pconn := connectedPacketConn{conn}
-
+	silenceLog()
+	defer unsilenceLog()
 	session, err := quic.Dial(context.Background(), pconn, rudpAddr, &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"qparts"}}, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
 	if err != nil {
 		return err

@@ -1,8 +1,7 @@
 package qpscion
 
 import (
-	"fmt"
-
+	"github.com/netsys-lab/qparts/pkg/qplogging"
 	"github.com/scionproto/scion/pkg/snet"
 )
 
@@ -28,7 +27,7 @@ func (pc *PathCache) Refresh(remote *snet.UDPAddr) error {
 
 // TODO: Add expiration time
 func (pc *PathCache) Get(remote *snet.UDPAddr) ([]QPartsPath, error) {
-	fmt.Println("Getting paths for remote: ", remote)
+	qplogging.Log.Debug("Getting paths for remote: ", remote)
 	if err := pc.Refresh(remote); err != nil {
 		return nil, err
 	}

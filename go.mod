@@ -85,3 +85,4 @@ require (
 )
 
 replace github.com/netsys-lab/scion-optimized-connection => ../scion-optimized-connection
+replace github.com/netsys-lab/scion-pila => ../scion-pila

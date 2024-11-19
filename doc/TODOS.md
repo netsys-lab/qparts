@@ -9,7 +9,7 @@
 - [x] Implement Deadline functionalities
 - Stream Types
 - Priorities
-- Crypto
+- [x] Crypto
 - MTU Discovery and handling
 - Send loop
 - Change path on the fly for optimizedConn

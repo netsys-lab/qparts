@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/netsys-lab/qparts/pkg/qpcrypto"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
 	optimizedconn "github.com/netsys-lab/scion-optimized-connection/pkg"
 
@@ -94,13 +95,19 @@ func (ssqc *SingleStreamQUICConn) ListenAndAccept(local *snet.UDPAddr) error {
 
 	pconn := connectedPacketConn{conn}
 
-	certs, err := ssqc.certificateFunc(local)
+	/*certs, err := ssqc.certificateFunc(local)
+	if err != nil {
+		return err
+	}*/
+	silenceLog()
+	defer unsilenceLog()
+
+	tlsConf, err := qpcrypto.NewQPartsListenTLSConfig(local)
 	if err != nil {
 		return err
 	}
-	silenceLog()
-	defer unsilenceLog()
-	listener, err := quic.Listen(pconn, &tls.Config{InsecureSkipVerify: true, Certificates: certs, NextProtos: []string{"qparts"}}, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
+
+	listener, err := quic.Listen(pconn, tlsConf, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
 	if err != nil {
 		return err
 	}
@@ -143,7 +150,10 @@ func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote *snet.UDPAddr) error
 	pconn := connectedPacketConn{conn}
 	silenceLog()
 	defer unsilenceLog()
-	session, err := quic.Dial(context.Background(), pconn, rudpAddr, &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"qparts"}}, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
+
+	tlsConf := qpcrypto.NewQPartsDialTLSConfig(remote)
+
+	session, err := quic.Dial(context.Background(), pconn, rudpAddr, tlsConf, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
 	if err != nil {
 		return err
 	}

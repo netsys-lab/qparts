@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"time"
 
 	qparts "github.com/netsys-lab/qparts"
 )
@@ -54,15 +53,15 @@ func main() {
 		}
 
 		fmt.Println(" -------------------------------------- ")
-		fmt.Println("Received ", n, " bytes via stream")
 		fmt.Printf("Hash %x\n", sha256.Sum256(buf))
+		fmt.Println("Received ", n, " bytes via stream")
 
 		// }
 
 	} else {
 		remoteAddr := os.Args[3]
 		file := os.Args[4]
-		fmt.Println(remoteAddr)
+		// fmt.Println(remoteAddr)
 		conn, err := qparts.Dial(localAddr, remoteAddr)
 		if err != nil {
 			log.Fatal(err)
@@ -112,7 +111,7 @@ func main() {
 		fmt.Println(" -------------------------------------- ")
 		fmt.Printf("Hash %x\n", sha256.Sum256(buf))
 		fmt.Println("Sent ", n, " bytes via stream")
-		time.Sleep(1 * time.Second)
+		// time.Sleep(1 * time.Second)
 
 	}
 

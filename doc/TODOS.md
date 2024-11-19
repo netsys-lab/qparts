@@ -1,19 +1,20 @@
 # Main TODOS
 
-- Proper Logging
+- [x] Proper Logging
 - Proper error handling
-- Proper number of QUICDataplaneStreams
-- Do proper logging
-- Hide quic go not a udp conn message
+- [x] Proper number of QUICDataplaneStreams
+- [x] Hide quic go not a udp conn message
 - [x] Return proper numbers of Read/Write from API
 - [x] Communicate paths from conn to QUICDataplaneStream for reverse scheduling
-- Implement Deadline functionalities
+- [x] Implement Deadline functionalities
 - Stream Types
 - Priorities
-- ReadLarge/WriteLarge Methods
 - Crypto
 - MTU Discovery and handling
 - Send loop
 - Change path on the fly for optimizedConn
+- Add metrics for both directions -> path from optimizedConn -> reverse?
+- Complete QuicConnTracer
+- Add UMCC
 
 ## Bugs

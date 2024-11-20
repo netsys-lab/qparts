@@ -230,6 +230,7 @@ func (cp *ControlPlane) readLoop() error {
 				conn:       cp.pConn,
 				ReadBuffer: qpnet.NewPacketBuffer(),
 			}
+			qplogging.Log.Info("Got new PartsStream ", p.StreamId)
 			cp.NewStreamChan <- s
 			qplogging.Log.Debug("Received new stream handshake")
 			break
@@ -304,6 +305,7 @@ func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
 	}
 
 	// TODO: May negotiate stream parameters here
+	qplogging.Log.Info("Got new PartsStream ", p.StreamId)
 	qplogging.Log.Debug("Opened stream with id ", s.Id)
 	return s, nil
 }

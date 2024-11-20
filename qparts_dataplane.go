@@ -111,6 +111,7 @@ func (dp *QPartsDataplane) writeLoop() error {
 				partsDatapacket := qpproto.NewQPartsDataplanePacket()
 				partsDatapacket.Flags = PARTS_MSG_DATA
 				partsDatapacket.StreamId = dataAssignment.StreamId
+				qplogging.Log.Info("STREAMID ", partsDatapacket.StreamId)
 				partsDatapacket.SequenceId = compl.SequenceId
 				partsDatapacket.PartId = dataAssignment.PartId
 				partsDatapacket.SequenceSize = compl.SequenceSize
@@ -171,8 +172,11 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 		dataAssignment.NumParts = uint64(len(schedulingDecision.Assignments))
 		dataAssignment.SequenceId = compl.SequenceId
 		dataAssignment.PartId = uint64(i)
-		dataAssignment.DataplaneStream.Queue.Add(dataAssignment)
+		dataAssignment.SequenceSize = compl.SequenceSize
 		dataAssignment.StreamId = id
+
+		dataAssignment.DataplaneStream.Queue.Add(dataAssignment)
+
 		sentBytes += len(dataAssignment.Data)
 	}
 
@@ -243,6 +247,7 @@ func (dp *QPartsDataplane) readLoop() error {
 					panic("No data received")
 				}
 				partsDatapacket.Decode()
+				qplogging.Log.Info("STREAMID ", partsDatapacket.StreamId)
 
 				compl := dp.completionStore.GetOrCreateSequenceCompletion(partsDatapacket.StreamId, partsDatapacket.SequenceId, partsDatapacket.NumParts, partsDatapacket.SequenceSize)
 
@@ -269,7 +274,9 @@ func (dp *QPartsDataplane) readLoop() error {
 					// TODO: Access QPARTSStream Here
 					s := dp.QPartsStreams[partsDatapacket.StreamId]
 					dp.completionStore.RemoveCompletion(partsDatapacket.SequenceId)
-
+					qplogging.Log.Info("Trying to access stream ", partsDatapacket.StreamId)
+					//qplogging.Log.Info("compl ", compl)
+					//qplogging.Log.Info("stream ", s)
 					s.ReadBuffer.Append(compl.Data)
 					qplogging.Log.Debug("Sequence complete: ", compl.SequenceId)
 				}

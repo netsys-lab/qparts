@@ -14,6 +14,7 @@ type QPartsSequenceCompletion struct {
 	CompletedParts int
 	Data           []byte
 	internalParts  [][]byte
+	Completed      bool
 }
 
 func (sc *QPartsSequenceCompletion) AddPart(index int, data []byte) bool {
@@ -33,6 +34,7 @@ func (sc *QPartsSequenceCompletion) AddPart(index int, data []byte) bool {
 			copy(sc.Data[offset:], part)
 			offset += len(part)
 		}
+		sc.Completed = true
 		// qplogging.Log.Debugf("COMPLETE Hash %x\n", sha256.Sum256(sc.Data))
 	}
 	return compl

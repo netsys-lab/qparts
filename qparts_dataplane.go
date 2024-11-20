@@ -38,9 +38,11 @@ type QPartsDataplane struct {
 }
 
 type QPartsDataplaneStream struct {
+	sync.Mutex
 	ssqc *qpnet.SingleStreamQUICConn
 	// path      snet.DataplanePath
 	PartsPath *qpscion.QPartsPath
+	Queue     *qpnet.Queue[DataAssignment]
 }
 
 func NewQPartsDataplane(scheduler *Scheduler, partsStreams map[uint64]*PartsStream) *QPartsDataplane {
@@ -60,6 +62,7 @@ func (dp *QPartsDataplane) AddDialStream(id uint64, ssqc *qpnet.SingleStreamQUIC
 	dp.Streams[id] = &QPartsDataplaneStream{
 		ssqc:      ssqc,
 		PartsPath: path,
+		Queue:     qpnet.NewQueue[DataAssignment](),
 	}
 	qplogging.Log.Debug("Added dial stream")
 
@@ -75,7 +78,8 @@ func (dp *QPartsDataplane) ScheduleWrite(data []byte, stream *PartsStream) Sched
 
 func (dp *QPartsDataplane) AddListenStream(id uint64, ssqc *qpnet.SingleStreamQUICConn) error {
 	dp.Streams[id] = &QPartsDataplaneStream{
-		ssqc: ssqc,
+		ssqc:  ssqc,
+		Queue: qpnet.NewQueue[DataAssignment](),
 	}
 	qplogging.Log.Debug("Added listen stream")
 
@@ -92,9 +96,62 @@ func generateRandomBytes(size int) ([]byte, error) {
 	return bytes, nil
 }
 
+func (dp *QPartsDataplane) writeLoop() error {
+
+	var wg sync.WaitGroup
+
+	for streamId, stream := range dp.Streams {
+		wg.Add(1)
+		qplogging.Log.Info("Starting write loop for stream ", streamId)
+		go func(streamId uint64, stream *QPartsDataplaneStream) {
+			for {
+				dataAssignment := stream.Queue.Get()
+				compl := dp.completionStore.GetOrCreateSequenceCompletion(streamId, dataAssignment.SequenceId, dataAssignment.NumParts, dataAssignment.SequenceSize)
+				// fmt.Println("Sending data packet: ", i)
+				partsDatapacket := qpproto.NewQPartsDataplanePacket()
+				partsDatapacket.Flags = PARTS_MSG_DATA
+				partsDatapacket.StreamId = dataAssignment.StreamId
+				partsDatapacket.SequenceId = compl.SequenceId
+				partsDatapacket.PartId = dataAssignment.PartId
+				partsDatapacket.SequenceSize = compl.SequenceSize
+				partsDatapacket.NumParts = dataAssignment.NumParts
+
+				partsDatapacket.PartSize = uint64(len(dataAssignment.Data))
+				partsDatapacket.Encode()
+
+				n, err := dataAssignment.DataplaneStream.ssqc.WriteAll(partsDatapacket.Data)
+				if err != nil {
+					panic(err)
+				}
+
+				if n <= 0 {
+					panic("No data sent")
+				}
+				// qplogging.Log.Debug("Sent data packet: ", n)
+
+				n, err = dataAssignment.DataplaneStream.ssqc.WriteAll(dataAssignment.Data)
+				if err != nil {
+					panic(err)
+				}
+				if n <= 0 {
+					panic("No data sent")
+				}
+				fmt.Println("Sent data packet: ", n)
+				if compl.Completed {
+					dp.completionStore.RemoveCompletion(compl.SequenceId)
+				}
+
+			}
+			wg.Done()
+		}(streamId, stream)
+	}
+
+	wg.Wait()
+	return nil
+}
+
 func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision, id uint64) (int, error) {
 	qplogging.Log.Debug("Writing to stream ", id)
-	var wg sync.WaitGroup
 
 	compl := dp.completionStore.NewSequenceCompletionFromSchedulingDecision(id, schedulingDecision)
 	dp.completionStore.AddCompletion(compl)
@@ -103,48 +160,25 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 	sentBytes := 0
 	// TODO: Move to queue based approach for all streams?
 	for i, dataAssignment := range schedulingDecision.Assignments {
-		wg.Add(1)
+		/*wg.Add(1)
 		go func(dataAssignment DataAssignment, i int) {
-			fmt.Println("Sending data packet: ", i)
-			partsDatapacket := qpproto.NewQPartsDataplanePacket()
-			partsDatapacket.Flags = PARTS_MSG_DATA
-			partsDatapacket.StreamId = id
-			partsDatapacket.SequenceId = compl.SequenceId
-			partsDatapacket.PartId = uint64(i)
-			partsDatapacket.SequenceSize = compl.SequenceSize
-			partsDatapacket.NumParts = uint64(len(schedulingDecision.Assignments))
 
-			partsDatapacket.PartSize = uint64(len(dataAssignment.Data))
-			partsDatapacket.Encode()
-
-			n, err := dataAssignment.DataplaneStream.ssqc.WriteAll(partsDatapacket.Data)
-			if err != nil {
-				panic(err)
-			}
-
-			if n <= 0 {
-				panic("No data sent")
-			}
-			// qplogging.Log.Debug("Sent data packet: ", n)
-
-			n, err = dataAssignment.DataplaneStream.ssqc.WriteAll(dataAssignment.Data)
-			if err != nil {
-				panic(err)
-			}
-			if n <= 0 {
-				panic("No data sent")
-			}
-			fmt.Println("Sent data packet: ", n)
 			// qplogging.Log.Debugf("Copying data %x from %d to %d \n", sha256.Sum256(dataAssignment.Data), i, i+len(dataAssignment.Data))
 			// qplogging.Log.Debugf("Sent %x on Stream %d for id %d\n", sha256.Sum256(dataAssignment.Data), id, int(partsDatapacket.PartId))
 			sentBytes += len(dataAssignment.Data)
 			wg.Done()
-		}(dataAssignment, i)
+		}(dataAssignment, i)*/
+		dataAssignment.NumParts = uint64(len(schedulingDecision.Assignments))
+		dataAssignment.SequenceId = compl.SequenceId
+		dataAssignment.PartId = uint64(i)
+		dataAssignment.DataplaneStream.Queue.Add(dataAssignment)
+		dataAssignment.StreamId = id
+		sentBytes += len(dataAssignment.Data)
 	}
 
-	dp.completionStore.RemoveCompletion(compl.SequenceId)
+	// dp.completionStore.RemoveCompletion(compl.SequenceId)
 
-	wg.Wait()
+	// wg.Wait()
 	return sentBytes, nil
 
 	/*for streamId, stream := range dp.Streams {

@@ -26,10 +26,11 @@ func NewQPartsListenTLSConfig(local *snet.UDPAddr) (*tls.Config, error) {
 	}
 
 	certificate, err := client.FetchCertificateFromSigningRequest(local.String(), csr)
-	fmt.Println("Certificate fetched")
+
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("Certificate fetched")
 
 	tlsCerts, err := scionpila.CreateTLSCertificate(certificate, key)
 	if err != nil {

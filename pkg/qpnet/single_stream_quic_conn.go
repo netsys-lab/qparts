@@ -99,18 +99,18 @@ func (ssqc *SingleStreamQUICConn) ListenAndAccept(local *snet.UDPAddr) error {
 	if err != nil {
 		return err
 	}*/
-	silenceLog()
-	defer unsilenceLog()
 
 	tlsConf, err := qpcrypto.NewQPartsListenTLSConfig(local)
 	if err != nil {
 		return err
 	}
 
+	silenceLog()
 	listener, err := quic.Listen(pconn, tlsConf, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
 	if err != nil {
 		return err
 	}
+	unsilenceLog()
 
 	for {
 		sess, err := listener.Accept(context.Background())
@@ -148,15 +148,14 @@ func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote *snet.UDPAddr) error
 	}
 
 	pconn := connectedPacketConn{conn}
-	silenceLog()
-	defer unsilenceLog()
 
 	tlsConf := qpcrypto.NewQPartsDialTLSConfig(remote)
-
+	silenceLog()
 	session, err := quic.Dial(context.Background(), pconn, rudpAddr, tlsConf, &quic.Config{Tracer: ssqc.QTracer.NewTracerHandler()})
 	if err != nil {
 		return err
 	}
+	unsilenceLog()
 
 	stream, err := session.OpenStreamSync(context.Background())
 	if err != nil {

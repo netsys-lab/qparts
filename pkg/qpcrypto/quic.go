@@ -2,8 +2,6 @@ package qpcrypto
 
 import (
 	"crypto/tls"
-	"fmt"
-	"log"
 
 	"github.com/netsys-lab/qparts/pkg/qpenv"
 	scionpila "github.com/netsys-lab/scion-pila"
@@ -22,19 +20,17 @@ func NewQPartsListenTLSConfig(local *snet.UDPAddr) (*tls.Config, error) {
 	key := scionpila.NewPrivateKey()
 	csr, err := scionpila.NewCertificateSigningRequest(key)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	certificate, err := client.FetchCertificateFromSigningRequest(local.String(), csr)
-
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	fmt.Println("Certificate fetched")
 
 	tlsCerts, err := scionpila.CreateTLSCertificate(certificate, key)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return &tls.Config{InsecureSkipVerify: true, Certificates: tlsCerts, NextProtos: []string{"qparts"}}, nil

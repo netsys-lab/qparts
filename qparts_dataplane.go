@@ -1,6 +1,7 @@
 package qparts
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 
@@ -104,6 +105,7 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 	for i, dataAssignment := range schedulingDecision.Assignments {
 		wg.Add(1)
 		go func(dataAssignment DataAssignment, i int) {
+			fmt.Println("Sending data packet: ", i)
 			partsDatapacket := qpproto.NewQPartsDataplanePacket()
 			partsDatapacket.Flags = PARTS_MSG_DATA
 			partsDatapacket.StreamId = id
@@ -132,7 +134,7 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 			if n <= 0 {
 				panic("No data sent")
 			}
-
+			fmt.Println("Sent data packet: ", n)
 			// qplogging.Log.Debugf("Copying data %x from %d to %d \n", sha256.Sum256(dataAssignment.Data), i, i+len(dataAssignment.Data))
 			// qplogging.Log.Debugf("Sent %x on Stream %d for id %d\n", sha256.Sum256(dataAssignment.Data), id, int(partsDatapacket.PartId))
 			sentBytes += len(dataAssignment.Data)
@@ -211,9 +213,10 @@ func (dp *QPartsDataplane) readLoop() error {
 				compl := dp.completionStore.GetOrCreateSequenceCompletion(partsDatapacket.StreamId, partsDatapacket.SequenceId, partsDatapacket.NumParts, partsDatapacket.SequenceSize)
 
 				//qplogging.Log.Debugf("Received compl %p %d %d %d %d %d\n\n", compl, compl.StreamId, compl.SequenceId, compl.Parts, compl.SequenceSize, compl.CompletedParts)
-				//qplogging.Log.Debug("With size ", partsDatapacket.PartSize)
+				qplogging.Log.Debug("With size ", partsDatapacket.PartSize)
 
 				data := make([]byte, partsDatapacket.PartSize)
+
 				n, err = stream.ssqc.ReadAll(data)
 				if err != nil {
 					panic(err)

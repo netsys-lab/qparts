@@ -16,6 +16,9 @@ type DataAssignment struct {
 	// Path   *PartsPath
 	DataplaneStream *QPartsDataplaneStream
 	Data            []byte
+	PartId          uint64
+	SequenceId      uint64
+	Priority        int
 	Remote          *snet.UDPAddr
 }
 

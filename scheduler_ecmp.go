@@ -135,7 +135,7 @@ func (sr *SchedulerECMP) InitialPathSelection(preference uint32, paths []qpscion
 	}
 
 	lowLatency, highThroughput := selectPaths(paths)
-	qplogging.Log.Debug("Low Latency Path:", lowLatency.Id)
+	qplogging.Log.Debug("Low Latency Path:", lowLatency.Sorter)
 
 	returnPaths := make([]qpscion.QPartsPath, 0)
 	returnPaths = append(returnPaths, lowLatency)
@@ -151,6 +151,7 @@ func (sr *SchedulerECMP) InitialPathSelection(preference uint32, paths []qpscion
 	qplogging.Log.Debug("Selected ", len(returnPaths), " paths for initial path selection")
 	// qplogging.Log.Debug(paths[:3])
 	return returnPaths, nil
+	// return paths[:1], nil
 }
 
 // selectPaths selects paths for low latency and high throughput

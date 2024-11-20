@@ -74,6 +74,7 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 	cp.initialPathSelection = initialPathSelection
 
 	rAddr := remote.Copy()
+	rAddr.NextHop = paths[0].Internal.UnderlayNextHop()
 	rAddr.Path = paths[0].Internal.Dataplane()
 
 	err = cp.ControlConn.DialAndOpen(cp.local, rAddr)
@@ -88,8 +89,8 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 	hs.ConnId = newConnId()
 	hs.Flags = PARTS_MSG_HS
 	hs.Version = getVersion()
-	hs.StartPortRange = 44000
-	hs.EndPortRange = 44010
+	hs.StartPortRange = 31500
+	hs.EndPortRange = 31510
 	hs.NumStreams = uint16(len(initialPathSelection))
 	hs.Encode()
 
@@ -158,8 +159,8 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		hs.ConnId = newConnId()
 		hs.Flags = PARTS_MSG_HS
 		hs.Version = getVersion()
-		hs.StartPortRange = 42000
-		hs.EndPortRange = 42010
+		hs.StartPortRange = 31600
+		hs.EndPortRange = 31610
 		hs.Encode()
 		cp.localHandshake = hs
 
@@ -351,6 +352,7 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 			remote.Host.Port = int(cp.remoteHandshake.StartPortRange) + i
 
 			remote.Path = path.Internal.Dataplane()
+			remote.NextHop = path.Internal.UnderlayNextHop()
 			err := ssqc.DialAndOpen(local, remote)
 			// TODO: ErrGroup
 			if err != nil {

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	qparts "github.com/netsys-lab/qparts"
 )
@@ -46,6 +47,7 @@ func main() {
 		fmt.Println("Received ", n, " bytes for size")
 		size = binary.BigEndian.Uint64(sizeData)
 		buf := make([]byte, size)
+		fmt.Println("Size: ", size)
 
 		n, err = io.ReadFull(stream, buf)
 		if err != nil {
@@ -111,6 +113,7 @@ func main() {
 		fmt.Println(" -------------------------------------- ")
 		fmt.Printf("Hash %x\n", sha256.Sum256(buf))
 		fmt.Println("Sent ", n, " bytes via stream")
+		time.Sleep(10 * time.Second)
 		// time.Sleep(1 * time.Second)
 
 	}

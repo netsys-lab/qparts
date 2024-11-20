@@ -45,7 +45,7 @@ func SetLogLevel(level int) {
 func init() {
 	Log = &PartsLogger{
 		out:   os.Stdout,
-		Level: PARTS_LOG_LEVEL_INFO,
+		Level: PARTS_LOG_LEVEL_DEBUG,
 	}
 }
 

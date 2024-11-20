@@ -1,11 +1,19 @@
 package qpnet
 
-import "github.com/scionproto/scion/pkg/snet"
+import (
+	"github.com/netsys-lab/qparts/pkg/qpscion"
+	"github.com/scionproto/scion/pkg/snet"
+)
+
+type PathCongestion struct {
+	PathId         uint32
+	Path           *qpscion.QPartsPath
+	ThroughputDrop float64
+	PacketLoss     float64
+}
 
 type CongestionEvent struct {
-	Remote     *snet.UDPAddr
-	EventType  string
-	PathId     uint32
-	Throughput uint32
-	PacketLoss uint32
+	Remote          *snet.UDPAddr
+	Reason          string
+	CongestionPaths []PathCongestion
 }

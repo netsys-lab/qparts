@@ -17,6 +17,7 @@ type QPartsPath struct {
 	Sorter      string
 	MTU         int
 	PayloadSize int
+	Hops        int
 }
 
 func IdFromSnetPath(path snet.Path) string {
@@ -68,10 +69,11 @@ func QueryPaths(remote addr.IA) ([]QPartsPath, error) {
 		PartsPath := QPartsPath{
 			Internal:    path,
 			Interfaces:  InterfacesToIds(path.Metadata().Interfaces),
-			Id:          id,   // IdFromSnetPath(path),
-			MTU:         1472, // TODO: MTU Discovery
+			Id:          id,                       // IdFromSnetPath(path),
+			MTU:         int(path.Metadata().MTU), // TODO: MTU Discovery
 			Sorter:      pathSorter,
 			PayloadSize: 1200, // TODO: Payloadsize
+			Hops:        len(path.Metadata().Interfaces) / 2,
 		}
 		PartsPath.Sorter = strings.Join(PartsPath.Interfaces, ",")
 		PartsPaths = append(PartsPaths, PartsPath)
@@ -79,10 +81,10 @@ func QueryPaths(remote addr.IA) ([]QPartsPath, error) {
 
 	SortPartsPaths(PartsPaths)
 
-	if len(PartsPaths) == 1 {
-		PartsPaths = append(PartsPaths, PartsPaths[0])
-		PartsPaths = append(PartsPaths, PartsPaths[0])
-	}
+	//if len(PartsPaths) == 1 {
+	//	PartsPaths = append(PartsPaths, PartsPaths[0])
+	//	PartsPaths = append(PartsPaths, PartsPaths[0])
+	//}
 
 	return PartsPaths, nil
 }

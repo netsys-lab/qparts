@@ -6,12 +6,6 @@ import (
 	"github.com/scionproto/scion/pkg/snet"
 )
 
-type IScheduler interface {
-	ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision
-	InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error)
-	OnCongestionEvent(event *qpnet.CongestionEvent) error
-}
-
 type Scheduler struct {
 	plugins      []SchedulerPlugin
 	activePlugin SchedulerPlugin
@@ -32,7 +26,8 @@ type SchedulingDecision struct {
 type SchedulerPlugin interface {
 	ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision
 	InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error)
-	OnCongestionEvent(event *qpnet.CongestionEvent) error
+	PathSelectionForProbing(preference uint32, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
+	PathSelectionAfterCongestionEvent(preference uint32, event *qpnet.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
 }
 
 func NewScheduler() *Scheduler {
@@ -46,9 +41,9 @@ func NewScheduler() *Scheduler {
 	return s
 }
 
-func (s *Scheduler) OnCongestionEvent(event *qpnet.CongestionEvent) error {
-	return s.activePlugin.OnCongestionEvent(event)
-}
+//func (s *Scheduler) OnCongestionEvent(event *qpnet.CongestionEvent) error {
+//	return s.activePlugin.OnCongestionEvent(event)
+//}
 
 func (s *Scheduler) ActivatePlugin(p SchedulerPlugin) {
 	// Ensure plugin only added once

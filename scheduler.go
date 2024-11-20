@@ -18,6 +18,9 @@ type DataAssignment struct {
 	Data            []byte
 	PartId          uint64
 	SequenceId      uint64
+	SequenceSize    uint64
+	NumParts        uint64
+	StreamId        uint64
 	Priority        int
 	Remote          *snet.UDPAddr
 }

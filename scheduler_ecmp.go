@@ -151,7 +151,7 @@ func (sr *SchedulerECMP) InitialPathSelection(preference uint32, paths []qpscion
 	qplogging.Log.Debug("Selected ", len(returnPaths), " paths for initial path selection")
 	// qplogging.Log.Debug(paths[:3])
 	return returnPaths, nil
-	// return paths[:1], nil
+	//return paths[:3], nil
 }
 
 // selectPaths selects paths for low latency and high throughput

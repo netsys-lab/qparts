@@ -81,10 +81,10 @@ func QueryPaths(remote addr.IA) ([]QPartsPath, error) {
 
 	SortPartsPaths(PartsPaths)
 
-	//if len(PartsPaths) == 1 {
-	//	PartsPaths = append(PartsPaths, PartsPaths[0])
-	//	PartsPaths = append(PartsPaths, PartsPaths[0])
-	//}
+	/*if len(PartsPaths) == 1 {
+		PartsPaths = append(PartsPaths, PartsPaths[0])
+		PartsPaths = append(PartsPaths, PartsPaths[0])
+	}*/
 
 	return PartsPaths, nil
 }

@@ -3,6 +3,8 @@ package qparts
 import (
 	"math/rand"
 	"sync"
+
+	"github.com/netsys-lab/qparts/pkg/qplogging"
 )
 
 type QPartsSequenceCompletion struct {
@@ -14,26 +16,29 @@ type QPartsSequenceCompletion struct {
 	CompletedParts int
 	Data           []byte
 	internalParts  [][]byte
+	Completed      bool
 }
 
 func (sc *QPartsSequenceCompletion) AddPart(index int, data []byte) bool {
 	sc.Lock()
 	defer sc.Unlock()
-	// qplogging.Log.Debug("Adding part ", index)
+	qplogging.Log.Debug("Adding part ", index)
 	sc.CompletedParts++
 	sc.internalParts[index] = data
 
 	// Copy into data starting from index
-	// qplogging.Log.Debugf("Copying data %x from %d to %d \n", sha256.Sum256(data), index, index+len(data))
+	// qplogging.Log.Debugf("Copying data %x with len %d \n", sha256.Sum256(data), len(data))
 	//
 	compl := sc.IsComplete()
 	if compl {
 		offset := 0
+		copied := 0
 		for _, part := range sc.internalParts {
-			copy(sc.Data[offset:], part)
+			copied += copy(sc.Data[offset:], part)
 			offset += len(part)
 		}
-		// qplogging.Log.Debugf("COMPLETE Hash %x\n", sha256.Sum256(sc.Data))
+		sc.Completed = true
+		// qplogging.Log.Debugf("COMPLETE Hash %x with len %d and copied %d\n", sha256.Sum256(sc.Data), len(sc.Data), copied)
 	}
 	return compl
 }
@@ -92,7 +97,7 @@ func (cs *CompletionStore) GetOrCreateSequenceCompletion(streamId uint64, sequen
 		SequenceSize:  sequenceSize,
 		internalParts: make([][]byte, numParts),
 	}
-
+	qplogging.Log.Debugf("Creating completion for stream %d with sequence %d and %d parts and sequenceSize %d \n", streamId, sequenceId, numParts, sequenceSize)
 	pc.Data = make([]byte, sequenceSize)
 	cs.Completions[sequenceId] = pc
 

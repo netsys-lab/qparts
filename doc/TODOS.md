@@ -11,10 +11,11 @@
 - Priorities
 - [x] Crypto
 - MTU Discovery and handling
-- Send loop
+- [x] Send loop
 - Change path on the fly for optimizedConn
 - Add metrics for both directions -> path from optimizedConn -> reverse?
 - Complete QuicConnTracer
 - Add UMCC
+- Wait for completion of sequence / sequence Ack? -> not mandatorily
 
 ## Bugs

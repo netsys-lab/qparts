@@ -3,6 +3,7 @@ package qpnet
 import (
 	"context"
 
+	"github.com/netsys-lab/qparts/pkg/qplogging"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/logging"
@@ -31,18 +32,18 @@ func (qt *QPartsQuicTracer) NewTracerHandler() func(context context.Context, per
 		qt.ConnectionID = connectionID
 
 		qt.Tracer = &logging.ConnectionTracer{}
-		/*qt.Tracer.UpdatedCongestionState = func(state logging.CongestionState) {
+		qt.Tracer.UpdatedCongestionState = func(state logging.CongestionState) {
 			if state == logging.CongestionStateRecovery {
-				qplogging.Log.Info("Received recovery state on connection ", connectionID)
 				if qt.Path != nil {
-					qplogging.Log.Info("Path: ", qt.Path)
+					qplogging.Log.Info("Received recovery state on connection ", connectionID)
+					// qplogging.Log.Info("Path: ", qt.Path)
 				}
 			}
 		}
 		qt.Tracer.LostPacket = func(encLevel logging.EncryptionLevel, packetNumber logging.PacketNumber, reason logging.PacketLossReason) {
-			qplogging.Log.Info("Lost Packet with reason ", reason, " on conn ", connectionID)
 			if qt.Path != nil {
-				qplogging.Log.Info("Path: ", qt.Path)
+				qplogging.Log.Info("Lost Packet with reason ", reason, " on conn ", connectionID)
+				// qplogging.Log.Info("Path: ", qt.Path)
 			}
 		}
 
@@ -55,7 +56,7 @@ func (qt *QPartsQuicTracer) NewTracerHandler() func(context context.Context, per
 			//if qt.Path != nil {
 			//	qplogging.Log.Info("Path: ", qt.Path)
 			//}
-		}*/
+		}
 
 		return qt.Tracer
 	}

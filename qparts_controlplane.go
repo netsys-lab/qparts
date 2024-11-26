@@ -83,7 +83,7 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 	rAddr.NextHop = paths[0].Internal.UnderlayNextHop()
 	rAddr.Path = paths[0].Internal.Dataplane()
 
-	err = cp.ControlConn.DialAndOpen(cp.local, rAddr)
+	err = cp.ControlConn.DialAndOpenWithPath(cp.local, rAddr, &paths[0])
 	if err != nil {
 		return err
 	}
@@ -374,7 +374,7 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 
 			remote.Path = path.Internal.Dataplane()
 			remote.NextHop = path.Internal.UnderlayNextHop()
-			err := ssqc.DialAndOpen(local, remote)
+			err := ssqc.DialAndOpenWithPath(local, remote, path)
 			// TODO: ErrGroup
 			if err != nil {
 				errStr += err.Error()

@@ -133,7 +133,7 @@ func (ssqc *SingleStreamQUICConn) ListenAndAccept(local *snet.UDPAddr) error {
 	return nil
 }
 
-func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote *snet.UDPAddr) error {
+func (ssqc *SingleStreamQUICConn) DialAndOpenWithPath(local, remote *snet.UDPAddr, path *qpscion.QPartsPath) error {
 	rAddrPort := remote.Host.AddrPort()
 	rudpAddr := net.UDPAddrFromAddrPort(rAddrPort)
 
@@ -146,6 +146,10 @@ func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote *snet.UDPAddr) error
 	if err != nil {
 		return err
 	}
+	if path != nil {
+		ssqc.QTracer.SetPath(path)
+	}
+	ssqc.QTracer.SetDestination(remote)
 
 	pconn := connectedPacketConn{conn}
 
@@ -166,5 +170,9 @@ func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote *snet.UDPAddr) error
 	ssqc.stream = stream
 
 	return nil
+}
+
+func (ssqc *SingleStreamQUICConn) DialAndOpen(local, remote *snet.UDPAddr) error {
+	return ssqc.DialAndOpenWithPath(local, remote, nil)
 
 }

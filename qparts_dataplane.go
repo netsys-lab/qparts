@@ -106,7 +106,7 @@ func (dp *QPartsDataplane) writeLoop() error {
 		go func(streamId uint64, stream *QPartsDataplaneStream) {
 			for {
 				dataAssignment := stream.Queue.Get()
-				compl := dp.completionStore.GetOrCreateSequenceCompletion(streamId, dataAssignment.SequenceId, dataAssignment.NumParts, dataAssignment.SequenceSize)
+				compl := dp.completionStore.GetOrCreateSendingSequenceCompletion(dataAssignment.StreamId, dataAssignment.SequenceId, dataAssignment.NumParts, dataAssignment.SequenceSize)
 				// fmt.Println("Sending data packet: ", i)
 				partsDatapacket := qpproto.NewQPartsDataplanePacket()
 				partsDatapacket.Flags = PARTS_MSG_DATA
@@ -142,8 +142,13 @@ func (dp *QPartsDataplane) writeLoop() error {
 					continue
 				}
 				fmt.Println("Sent data packet: ", n)
-				if compl.Completed {
+				qplogging.Log.Debug("Compl: ", compl.CompletedParts, " / ", compl.Parts)
+				completed := compl.AddSendingPart(int(dataAssignment.PartId), dataAssignment.Data)
+				if completed {
 					dp.completionStore.RemoveCompletion(compl.SequenceId)
+					fmt.Println("Sent all parts for sequence ", compl.SequenceId)
+					fmt.Printf("Triggering completion %p\n", compl)
+					compl.CompleteChan <- true
 				}
 
 			}
@@ -188,6 +193,8 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 	// dp.completionStore.RemoveCompletion(compl.SequenceId)
 
 	// wg.Wait()
+	fmt.Printf("Waiting for completion %p\n", compl)
+	<-compl.CompleteChan
 	fmt.Println("Sent ", sentBytes, " bytes")
 	return sentBytes, nil
 

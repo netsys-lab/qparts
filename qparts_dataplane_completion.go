@@ -17,6 +17,24 @@ type QPartsSequenceCompletion struct {
 	Data           []byte
 	internalParts  [][]byte
 	Completed      bool
+	CompleteChan   chan bool
+}
+
+func (sc *QPartsSequenceCompletion) AddSendingPart(index int, data []byte) bool {
+	sc.Lock()
+	defer sc.Unlock()
+	qplogging.Log.Debug("Completing part ", index)
+	sc.CompletedParts++
+
+	// Copy into data starting from index
+	// qplogging.Log.Debugf("Copying data %x with len %d \n", sha256.Sum256(data), len(data))
+	//
+	compl := sc.IsComplete()
+	if compl {
+		sc.Completed = true
+		// qplogging.Log.Debugf("COMPLETE Hash %x with len %d and copied %d\n", sha256.Sum256(sc.Data), len(sc.Data), copied)
+	}
+	return compl
 }
 
 func (sc *QPartsSequenceCompletion) AddPart(index int, data []byte) bool {
@@ -61,7 +79,7 @@ func NewCompletionStore() *CompletionStore {
 func (cs *CompletionStore) AddCompletion(c *QPartsSequenceCompletion) {
 	cs.Lock()
 	defer cs.Unlock()
-	cs.Completions[c.StreamId] = c
+	cs.Completions[c.SequenceId] = c
 }
 
 func (cs *CompletionStore) GetCompletion(sequenceId uint64) *QPartsSequenceCompletion {
@@ -80,6 +98,30 @@ func newSequenceId() uint64 {
 	return rand.Uint64()
 }
 
+func (cs *CompletionStore) GetOrCreateSendingSequenceCompletion(streamId uint64, sequenceId uint64, numParts uint64, sequenceSize uint64) *QPartsSequenceCompletion {
+
+	cs.Lock()
+
+	defer cs.Unlock()
+
+	if c, ok := cs.Completions[sequenceId]; ok {
+		return c
+	}
+
+	pc := &QPartsSequenceCompletion{
+		StreamId:      streamId,
+		SequenceId:    sequenceId,
+		Parts:         int(numParts),
+		SequenceSize:  sequenceSize,
+		internalParts: make([][]byte, numParts),
+		CompleteChan:  make(chan bool),
+	}
+	qplogging.Log.Debugf("Creating sending completion for stream %d with sequence %d and %d parts and sequenceSize %d \n", streamId, sequenceId, numParts, sequenceSize)
+	cs.Completions[sequenceId] = pc
+
+	return pc
+}
+
 func (cs *CompletionStore) GetOrCreateSequenceCompletion(streamId uint64, sequenceId uint64, numParts uint64, sequenceSize uint64) *QPartsSequenceCompletion {
 
 	cs.Lock()
@@ -96,6 +138,7 @@ func (cs *CompletionStore) GetOrCreateSequenceCompletion(streamId uint64, sequen
 		Parts:         int(numParts),
 		SequenceSize:  sequenceSize,
 		internalParts: make([][]byte, numParts),
+		CompleteChan:  make(chan bool),
 	}
 	qplogging.Log.Debugf("Creating completion for stream %d with sequence %d and %d parts and sequenceSize %d \n", streamId, sequenceId, numParts, sequenceSize)
 	pc.Data = make([]byte, sequenceSize)
@@ -107,17 +150,20 @@ func (cs *CompletionStore) GetOrCreateSequenceCompletion(streamId uint64, sequen
 func (cs *CompletionStore) NewSequenceCompletionFromSchedulingDecision(streamId uint64, decision *SchedulingDecision) *QPartsSequenceCompletion {
 
 	pc := &QPartsSequenceCompletion{
-		StreamId:   streamId,
-		SequenceId: newSequenceId(),
-		Parts:      len(decision.Assignments),
+		StreamId:     streamId,
+		SequenceId:   newSequenceId(),
+		Parts:        len(decision.Assignments),
+		CompleteChan: make(chan bool),
 	}
+
+	qplogging.Log.Debugf("Creating completion for stream %d with sequence %d and %d parts\n", streamId, pc.SequenceId, pc.Parts)
 
 	size := 0
 	for _, da := range decision.Assignments {
 		size += len(da.Data)
 	}
 
-	pc.Data = make([]byte, size)
+	// pc.Data = make([]byte, size)
 
 	pc.SequenceSize = uint64(size)
 

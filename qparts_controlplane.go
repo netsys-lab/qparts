@@ -361,6 +361,7 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 	errStr := ""
 	qplogging.Log.Debug("Racing streams over ", len(cp.initialPathSelection), " paths")
 	for i, path := range cp.initialPathSelection {
+		wg.Add(1)
 		go func(i int, path *qpscion.QPartsPath) {
 			// TODO: Might be a different getCertificateFunc
 			defer wg.Done()

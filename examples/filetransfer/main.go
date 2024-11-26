@@ -57,8 +57,6 @@ func main() {
 		fmt.Printf("Hash %x\n", sha256.Sum256(buf))
 		fmt.Println("Received ", n, " bytes via stream")
 
-		stream.Write(buf[:8])
-
 		// }
 
 	} else {
@@ -111,9 +109,6 @@ func main() {
 			fmt.Println("Error: ", err)
 			log.Fatal(err)
 		}
-
-		buf = make([]byte, 8)
-		stream.Read(buf)
 
 		fmt.Println(" -------------------------------------- ")
 		fmt.Printf("Hash %x\n", sha256.Sum256(buf))

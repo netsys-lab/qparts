@@ -1,4 +1,4 @@
-package qpnet
+package qpmetrics
 
 import (
 	"github.com/netsys-lab/qparts/pkg/qpscion"

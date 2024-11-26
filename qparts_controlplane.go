@@ -3,12 +3,14 @@ package qparts
 import (
 	"crypto/tls"
 	"encoding/binary"
+	"fmt"
 	"math/rand"
 	"sync"
 
 	"github.com/netsys-lab/qparts/pkg/qpcrypto"
 	"github.com/netsys-lab/qparts/pkg/qplogging"
 	log "github.com/netsys-lab/qparts/pkg/qplogging"
+	"github.com/netsys-lab/qparts/pkg/qpmetrics"
 	"github.com/netsys-lab/qparts/pkg/qpnet"
 	"github.com/netsys-lab/qparts/pkg/qpproto"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
@@ -56,6 +58,10 @@ func newConnId() uint64 {
 
 func getVersion() uint64 {
 	return 1
+}
+
+func (cp *ControlPlane) HandleCongestionEvent(event *qpmetrics.CongestionEvent) error {
+	return nil
 }
 
 func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
@@ -149,6 +155,9 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		}
 
 		remoteHs.Decode()
+
+		// TODO: Check version, nuance whatever to ensure this is a valid packet
+
 		cp.remoteHandshake = remoteHs
 
 		log.Log.Debug("Got incoming handshake")
@@ -168,14 +177,15 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		cp.remote = remote
 		log.Log.Debug("Remote CP: ", cp.remote.String())
 
-		go func() {
-			_, err := cp.ControlConn.WriteAll(hs.Data)
-			log.Log.Debug("Sent reply stream handshake")
-			// log.Log.Info("Count ", n2)
-			if err != nil {
-				panic(err)
-			}
-		}()
+		//go func() {
+		_, err = cp.ControlConn.WriteAll(hs.Data)
+
+		// log.Log.Info("Count ", n2)
+		if err != nil {
+			return err
+		}
+		log.Log.Debug("Sent reply stream handshake")
+		//}()
 
 		cp.RaceListenDataplaneStreams(int(remoteHs.NumStreams))
 		qplogging.Log.Debug("Done racing")
@@ -190,11 +200,12 @@ func (cp *ControlPlane) readLoop() error {
 		header := make([]byte, 4)
 		n, err := cp.ControlConn.ReadAll(header)
 		if err != nil {
-			panic(err)
+			qplogging.Log.Warn("Failed to read from control conn: ", err)
 		}
 
 		if n <= 0 {
-			panic("No data received")
+			qplogging.Log.Debug("No data received on control conn")
+			continue
 		}
 
 		flags := binary.BigEndian.Uint32(header)
@@ -204,11 +215,12 @@ func (cp *ControlPlane) readLoop() error {
 			p := qpproto.NewQPartsNewStreamPacket()
 			n, err := cp.ControlConn.ReadAll(p.Data[4:])
 			if err != nil {
-				panic(err)
+				qplogging.Log.Warn("Failed to parse PARTS_MSG_STREAM_HS: ", err)
 			}
 
 			if n <= 0 {
-				panic("No data received")
+				qplogging.Log.Debug("Failed to read PARTS_MSG_STREAM_HS data from control conn")
+				continue
 			}
 
 			copy(p.Data, header)
@@ -217,11 +229,13 @@ func (cp *ControlPlane) readLoop() error {
 			// TODO: May negotiate stream parameters here
 			n2, err := cp.ControlConn.WriteAll(p.Data)
 			if err != nil {
-				panic(err)
+				qplogging.Log.Warn("Failed to write to control conn: ", err)
+				continue
 			}
 
 			if n2 <= 0 {
-				panic("No data sent")
+				qplogging.Log.Debug("Failed to write PARTS_MSG_STREAM_HS data to control conn")
+				continue
 			}
 			// TODO: Send this information over control plane conn?
 			s := &PartsStream{
@@ -239,11 +253,13 @@ func (cp *ControlPlane) readLoop() error {
 			p := qpproto.NewQPartsNewStreamPacket()
 			n, err := cp.ControlConn.ReadAll(p.Data[4:])
 			if err != nil {
-				panic(err)
+				qplogging.Log.Warn("Failed to read PARTS_MSG_STREAM_PROPERTY from control conn: ", err)
+				continue
 			}
 
 			if n <= 0 {
-				panic("No data received")
+				qplogging.Log.Debug("Failed to read PARTS_MSG_STREAM_PROPERTY data to control conn")
+				continue
 			}
 
 			copy(p.Data, header)
@@ -252,11 +268,13 @@ func (cp *ControlPlane) readLoop() error {
 			// TODO: May negotiate stream parameters here
 			n2, err := cp.ControlConn.WriteAll(p.Data)
 			if err != nil {
-				panic(err)
+				qplogging.Log.Warn("Failed to write to control conn: ", err)
+				continue
 			}
 
 			if n2 <= 0 {
-				panic("No data sent")
+				qplogging.Log.Debug("Failed to write PARTS_MSG_STREAM_PROPERTY data to control conn")
+				continue
 			}
 			cp.streams[p.StreamId].Preference = p.StreamProperty
 			qplogging.Log.Debug("Update stream preference")
@@ -290,18 +308,18 @@ func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
 
 	n, err := cp.ControlConn.WriteAll(p.Data)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if n <= 0 {
-		panic("No data sent")
+		return nil, fmt.Errorf("no data sent to control conn to open stream")
 	}
 
 	n2, err := cp.ControlConn.ReadAll(p.Data)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if n2 <= 0 {
-		panic("No data received")
+		return nil, fmt.Errorf("no data received from control conn to open stream")
 	}
 
 	// TODO: May negotiate stream parameters here
@@ -319,18 +337,18 @@ func (cp *ControlPlane) ChangeStreamPreference(s *PartsStream, pref uint32) erro
 
 	n, err := cp.ControlConn.WriteAll(p.Data)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	if n <= 0 {
-		panic("No data sent")
+		return fmt.Errorf("no data sent to control conn to change stream preference")
 	}
 
 	n2, err := cp.ControlConn.ReadAll(p.Data)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	if n2 <= 0 {
-		panic("No data received")
+		return fmt.Errorf("no data received from control conn to change stream preference")
 	}
 
 	// TODO: May negotiate stream parameters here
@@ -340,12 +358,12 @@ func (cp *ControlPlane) ChangeStreamPreference(s *PartsStream, pref uint32) erro
 
 func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 	var wg sync.WaitGroup
-
+	errStr := ""
 	qplogging.Log.Debug("Racing streams over ", len(cp.initialPathSelection), " paths")
 	for i, path := range cp.initialPathSelection {
-		wg.Add(1)
 		go func(i int, path *qpscion.QPartsPath) {
 			// TODO: Might be a different getCertificateFunc
+			defer wg.Done()
 			ssqc := qpnet.NewSingleStreamQUICConn(getCertificateFunc)
 			dpStreamId := newConnId()
 			local := cp.local.Copy()
@@ -358,7 +376,8 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 			err := ssqc.DialAndOpen(local, remote)
 			// TODO: ErrGroup
 			if err != nil {
-				panic(err)
+				errStr += err.Error()
+				return
 			}
 
 			ssqc.SetPath(path)
@@ -367,12 +386,14 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 			_, err = ssqc.WriteAll(msg)
 			// TODO: ErrGroup
 			if err != nil {
-				panic(err)
+				errStr += err.Error()
+				return
 			}
 
 			_, err = ssqc.ReadAll(msg)
 			if err != nil {
-				panic(err)
+				errStr += err.Error()
+				return
 			}
 
 			qplogging.Log.Debug("Expected: Hello from CP")
@@ -382,13 +403,18 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 			err = cp.dp.AddDialStream(dpStreamId, ssqc, path)
 			// TODO: ErrGroup
 			if err != nil {
-				panic(err)
+				errStr += err.Error()
+				return
 			}
-			wg.Done()
 
 		}(i, &path)
 	}
 	wg.Wait()
+
+	if errStr != "" {
+		return fmt.Errorf("failed to dial at least one stream %s", errStr)
+	}
+
 	qplogging.Log.Debug("Done waiting")
 	go cp.dp.readLoop()
 	go cp.dp.writeLoop()
@@ -398,9 +424,11 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 func (cp *ControlPlane) RaceListenDataplaneStreams(numStreams int) error {
 	var wg sync.WaitGroup
 	qplogging.Log.Debug("Racing streams over ", numStreams, " paths")
+	var errStr string
 	for i := 0; i < numStreams; i++ {
 		wg.Add(1)
 		go func(i int) {
+			defer wg.Done()
 			// TODO: Might be a different getCertificateFunc
 			ssqc := qpnet.NewSingleStreamQUICConn(getCertificateFunc)
 
@@ -410,9 +438,9 @@ func (cp *ControlPlane) RaceListenDataplaneStreams(numStreams int) error {
 			err := ssqc.ListenAndAccept(local)
 			// TODO: ErrGroup
 			if err != nil {
-				panic(err)
+				errStr += err.Error()
+				return
 			}
-
 			// TODO: DP Handshake here
 			// TODO: Get stream ID here? Do we need it?
 
@@ -420,28 +448,36 @@ func (cp *ControlPlane) RaceListenDataplaneStreams(numStreams int) error {
 			n, err := ssqc.ReadAll(msg)
 			// TODO: ErrGroup
 			if err != nil {
-				panic(err)
+				errStr += err.Error()
+				return
 			}
 			if n <= 0 {
-				panic("No data received")
+				errStr += "No data received"
+				return
 			}
 
 			_, err = ssqc.WriteAll(msg)
 			if err != nil {
-				panic(err)
+				errStr += err.Error()
+				return
 			}
 
 			dpStreamId := newConnId()
 			err = cp.dp.AddListenStream(dpStreamId, ssqc)
 			// TODO: ErrGroup
 			if err != nil {
-				panic(err)
+				errStr += err.Error()
+				return
 			}
-			wg.Done()
 
 		}(i)
 	}
 	wg.Wait()
+
+	if errStr != "" {
+		return fmt.Errorf("failed to listen at least one stream %s", errStr)
+	}
+
 	qplogging.Log.Debug("Done waiting")
 	go cp.dp.readLoop()
 	go cp.dp.writeLoop()

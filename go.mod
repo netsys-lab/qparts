@@ -9,6 +9,7 @@ require (
 	github.com/netsys-lab/scion-pila v0.0.1
 	github.com/quic-go/quic-go v0.43.1
 	github.com/scionproto/scion v0.12.0
+	golang.org/x/sync v0.7.0
 	inet.af/netaddr v0.0.0-20230525184311-b8eac61e914a
 )
 
@@ -85,4 +86,5 @@ require (
 )
 
 replace github.com/netsys-lab/scion-optimized-connection => ../scion-optimized-connection
+
 replace github.com/netsys-lab/scion-pila => ../scion-pila

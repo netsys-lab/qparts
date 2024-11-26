@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"time"
 
 	qparts "github.com/netsys-lab/qparts"
 )
@@ -58,6 +57,8 @@ func main() {
 		fmt.Printf("Hash %x\n", sha256.Sum256(buf))
 		fmt.Println("Received ", n, " bytes via stream")
 
+		stream.Write(buf[:8])
+
 		// }
 
 	} else {
@@ -107,13 +108,17 @@ func main() {
 
 		n, err = stream.Write(buf)
 		if err != nil {
+			fmt.Println("Error: ", err)
 			log.Fatal(err)
 		}
+
+		buf = make([]byte, 8)
+		stream.Read(buf)
 
 		fmt.Println(" -------------------------------------- ")
 		fmt.Printf("Hash %x\n", sha256.Sum256(buf))
 		fmt.Println("Sent ", n, " bytes via stream")
-		time.Sleep(10 * time.Second)
+
 		// time.Sleep(1 * time.Second)
 
 	}

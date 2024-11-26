@@ -45,15 +45,16 @@ func (qt *QPartsQuicTracer) NewTracerHandler() func(context context.Context, per
 				qplogging.Log.Info("Path: ", qt.Path)
 			}
 		}
+
 		qt.Tracer.UpdatedMetrics = func(rttStats *logging.RTTStats, cwnd, bytesInFlight logging.ByteCount, packetsInFlight int) {
-			qplogging.Log.Info("Updated Metrics: ")
-			qplogging.Log.Info("RTT Stats: ", rttStats)
-			qplogging.Log.Info("CWND: ", cwnd)
-			qplogging.Log.Info("Bytes in Flight: ", bytesInFlight)
-			qplogging.Log.Info("Packets in Flight: ", packetsInFlight)
-			if qt.Path != nil {
-				qplogging.Log.Info("Path: ", qt.Path)
-			}
+			//qplogging.Log.Info("Updated Metrics: ")
+			// qplogging.Log.Info("RTT Stats: ", rttStats)
+			//qplogging.Log.Info("CWND: ", cwnd)
+			//qplogging.Log.Info("Bytes in Flight: ", bytesInFlight)
+			//qplogging.Log.Info("Packets in Flight: ", packetsInFlight)
+			//if qt.Path != nil {
+			//	qplogging.Log.Info("Path: ", qt.Path)
+			//}
 		}*/
 
 		return qt.Tracer

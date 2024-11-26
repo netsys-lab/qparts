@@ -2,10 +2,11 @@ package qparts
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 
 	"github.com/netsys-lab/qparts/pkg/qplogging"
-	"github.com/netsys-lab/qparts/pkg/qpnet"
+	"github.com/netsys-lab/qparts/pkg/qpmetrics"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
 )
 
@@ -22,7 +23,7 @@ func NewSchedulerECMP() *SchedulerECMP {
 	}
 }
 
-func (sr *SchedulerECMP) PathSelectionAfterCongestionEvent(preference uint32, event *qpnet.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath {
+func (sr *SchedulerECMP) PathSelectionAfterCongestionEvent(preference uint32, event *qpmetrics.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath {
 	return nil
 }
 
@@ -267,4 +268,57 @@ func selectTopN(paths []qpscion.QPartsPath, n int) []qpscion.QPartsPath {
 		n = len(paths)
 	}
 	return paths[:n]
+}
+
+/**
+// Example usage
+func main() {
+	paths := []PathMetrics{
+		{RTT: 10, Packetloss: 5, Throughput: 100, PathId: 1, CwndDecreaseEvents: 50, PacketLossEvents: 30},
+		{RTT: 15, Packetloss: 4, Throughput: 95, PathId: 2, CwndDecreaseEvents: 50, PacketLossEvents: 30},
+		{RTT: 20, Packetloss: 6, Throughput: 2000, PathId: 3, CwndDecreaseEvents: 1, PacketLossEvents: 1},
+	}
+
+	// Tolerance for similarity
+	tolerance := 0.1
+
+	similarPaths := FindSimilarPaths(paths, tolerance)
+	fmt.Println("Similar Paths:")
+	for _, pair := range similarPaths {
+		fmt.Printf("Pair: PathId %d and PathId %d\n", pair[0].PathId, pair[1].PathId)
+	}
+}
+	**/
+
+// FindSimilarPaths finds paths with similar PacketLossEvents/Throughput or CwndDecreaseEvents/Throughput ratios
+func FindSimilarPaths(paths []qpmetrics.PathMetrics, tolerance float64) [][]qpmetrics.PathMetrics {
+	var result [][]qpmetrics.PathMetrics
+
+	// Helper function to calculate similarity
+	isSimilar := func(a, b float64, tol float64) bool {
+		fmt.Println(a, b, tol, math.Abs(a-b))
+		return math.Abs(a-b) <= tol
+	}
+
+	for i := 0; i < len(paths); i++ {
+		for j := i + 1; j < len(paths); j++ {
+			// Avoid division by zero
+			if paths[i].Throughput == 0 || paths[j].Throughput == 0 {
+				continue
+			}
+
+			// Calculate ratios
+			ratio1Loss := float64(paths[i].PacketLossEvents) / float64(paths[i].Throughput)
+			ratio2Loss := float64(paths[j].PacketLossEvents) / float64(paths[j].Throughput)
+			ratio1Cwnd := float64(paths[i].CwndDecreaseEvents) / float64(paths[i].Throughput)
+			ratio2Cwnd := float64(paths[j].CwndDecreaseEvents) / float64(paths[j].Throughput)
+
+			// Check similarity
+			if isSimilar(ratio1Loss, ratio2Loss, tolerance) || isSimilar(ratio1Cwnd, ratio2Cwnd, tolerance) {
+				result = append(result, []qpmetrics.PathMetrics{paths[i], paths[j]})
+			}
+		}
+	}
+
+	return result
 }

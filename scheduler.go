@@ -1,7 +1,7 @@
 package qparts
 
 import (
-	"github.com/netsys-lab/qparts/pkg/qpnet"
+	"github.com/netsys-lab/qparts/pkg/qpmetrics"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
 	"github.com/scionproto/scion/pkg/snet"
 )
@@ -33,7 +33,7 @@ type SchedulerPlugin interface {
 	ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision
 	InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error)
 	PathSelectionForProbing(preference uint32, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
-	PathSelectionAfterCongestionEvent(preference uint32, event *qpnet.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
+	PathSelectionAfterCongestionEvent(preference uint32, event *qpmetrics.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
 }
 
 func NewScheduler() *Scheduler {

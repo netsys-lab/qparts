@@ -122,20 +122,24 @@ func (dp *QPartsDataplane) writeLoop() error {
 
 				n, err := dataAssignment.DataplaneStream.ssqc.WriteAll(partsDatapacket.Data)
 				if err != nil {
-					panic(err)
+					qplogging.Log.Warn("Error writing data packet: ", err)
+					continue
 				}
 
 				if n <= 0 {
-					panic("No data sent")
+					qplogging.Log.Warn("No data sent on dataconn")
+					continue
 				}
 				// qplogging.Log.Debug("Sent data packet: ", n)
 
 				n, err = dataAssignment.DataplaneStream.ssqc.WriteAll(dataAssignment.Data)
 				if err != nil {
-					panic(err)
+					qplogging.Log.Warn("Error writing data packet: ", err)
+					continue
 				}
 				if n <= 0 {
-					panic("No data sent")
+					qplogging.Log.Warn("No data sent on dataconn")
+					continue
 				}
 				fmt.Println("Sent data packet: ", n)
 				if compl.Completed {
@@ -176,6 +180,7 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 		dataAssignment.StreamId = id
 
 		dataAssignment.DataplaneStream.Queue.Add(dataAssignment)
+		qplogging.Log.Debug("Added data assignment to queue")
 
 		sentBytes += len(dataAssignment.Data)
 	}
@@ -183,47 +188,8 @@ func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision
 	// dp.completionStore.RemoveCompletion(compl.SequenceId)
 
 	// wg.Wait()
+	fmt.Println("Sent ", sentBytes, " bytes")
 	return sentBytes, nil
-
-	/*for streamId, stream := range dp.Streams {
-		wg.Add(1)
-		go func(streamId uint64, stream *QPartsDataplaneStream) {
-
-			partsDatapacket := NewQPartsDataplanePacket()
-			partsDatapacket.Flags = PARTS_MSG_DATA
-			partsDatapacket.StreamId = id
-			partsDatapacket.PartId = 1
-			partsDatapacket.FrameId = 1
-
-			data, _ := generateRandomBytes(1000000)
-			qplogging.Log.Debugf("%x\n", sha256.Sum256(data))
-
-			partsDatapacket.FrameSize = uint64(len(data))
-			partsDatapacket.Encode()
-
-			n, err := stream.ssqc.WriteAll(partsDatapacket.Data)
-			if err != nil {
-				panic(err)
-			}
-
-			if n <= 0 {
-				panic("No data sent")
-			}
-			qplogging.Log.Debug("Sent data packet: ", n)
-
-			n, err = stream.ssqc.WriteAll(data)
-			if err != nil {
-				panic(err)
-			}
-			if n <= 0 {
-				panic("No data sent")
-			}
-
-			qplogging.Log.Debug("sENT: ", partsDatapacket)
-			qplogging.Log.Debug("On stream ", streamId)
-
-		}(streamId, stream)
-	}*/
 
 }
 
@@ -241,10 +207,12 @@ func (dp *QPartsDataplane) readLoop() error {
 				qplogging.Log.Debug("Reading ", len(partsDatapacket.Data), " bytes on  stream ", streamId)
 				n, err := stream.ssqc.ReadAll(partsDatapacket.Data)
 				if err != nil {
-					panic(err)
+					qplogging.Log.Warn("Error reading data packet: ", err)
+					continue
 				}
 				if n <= 0 {
-					panic("No data received")
+					qplogging.Log.Warn("No data received on dataconn")
+					continue
 				}
 				partsDatapacket.Decode()
 				qplogging.Log.Info("STREAMID ", partsDatapacket.StreamId)
@@ -258,10 +226,12 @@ func (dp *QPartsDataplane) readLoop() error {
 
 				n, err = stream.ssqc.ReadAll(data)
 				if err != nil {
-					panic(err)
+					qplogging.Log.Warn("Error reading data packet: ", err)
+					continue
 				}
 				if n <= 0 {
-					panic("No data received")
+					qplogging.Log.Warn("No data received on dataconn")
+					continue
 				}
 
 				isComplete := compl.AddPart(int(partsDatapacket.PartId), data)

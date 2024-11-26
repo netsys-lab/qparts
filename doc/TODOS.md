@@ -1,7 +1,7 @@
 # Main TODOS
 
 - [x] Proper Logging
-- Proper error handling
+- [x] Proper error handling
 - [x] Proper number of QUICDataplaneStreams
 - [x] Hide quic go not a udp conn message
 - [x] Return proper numbers of Read/Write from API
@@ -16,6 +16,9 @@
 - Add metrics for both directions -> path from optimizedConn -> reverse?
 - Complete QuicConnTracer
 - Add UMCC
-- Wait for completion of sequence / sequence Ack? -> not mandatorily
+- [x] Wait for completion of sequence / sequence Ack? -> not mandatorily
+- Ignore timeouts for dataplane streams, send keepalives
+- Handle timeouts in racedial/listendial properly
+- Handle pathdown / errors when sending -> trigger event
 
 ## Bugs

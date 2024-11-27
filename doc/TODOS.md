@@ -20,5 +20,7 @@
 - Ignore timeouts for dataplane streams, send keepalives
 - Handle timeouts in racedial/listendial properly
 - Handle pathdown / errors when sending -> trigger event
+- Pass full QParts object to metrics
+- Add disjointness check for Path Similarity
 
 ## Bugs

@@ -3,7 +3,7 @@ package qpnet
 import (
 	"context"
 
-	"github.com/netsys-lab/qparts/pkg/qplogging"
+	"github.com/netsys-lab/qparts/pkg/qpmetrics"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/logging"
@@ -33,17 +33,32 @@ func (qt *QPartsQuicTracer) NewTracerHandler() func(context context.Context, per
 
 		qt.Tracer = &logging.ConnectionTracer{}
 		qt.Tracer.UpdatedCongestionState = func(state logging.CongestionState) {
-			if state == logging.CongestionStateRecovery {
-				if qt.Path != nil {
-					qplogging.Log.Info("Received recovery state on connection ", connectionID)
-					// qplogging.Log.Info("Path: ", qt.Path)
-				}
-			}
+			//if state == logging.CongestionStateRecovery {
+			//	if qt.Path != nil {
+			//	qplogging.Log.Info("Received recovery state on connection ", connectionID)
+			// qplogging.Log.Info("Path: ", qt.Path)
+			//	}
+			//}
 		}
 		qt.Tracer.LostPacket = func(encLevel logging.EncryptionLevel, packetNumber logging.PacketNumber, reason logging.PacketLossReason) {
 			if qt.Path != nil {
-				qplogging.Log.Info("Lost Packet with reason ", reason, " on conn ", connectionID)
+				// qplogging.Log.Info("Lost Packet with reason ", reason, " on conn ", connectionID)
 				// qplogging.Log.Info("Path: ", qt.Path)
+				qpmetrics.State.AddPacketLoss(qt.Destination.String(), qt.Path.Id, 1, qt.Path.Sorter)
+			}
+		}
+
+		qt.Tracer.SentLongHeaderPacket = func(hdr *logging.ExtendedHeader, count logging.ByteCount, ecn logging.ECN, ack *logging.AckFrame, frames []logging.Frame) {
+			// qplogging.Log.Debug("Sent Long Header Packet with size ", count)
+			if qt.Path != nil {
+				qpmetrics.State.AddThroughput(qt.Destination.String(), qt.Path.Id, uint64(count), qt.Path.Sorter)
+			}
+		}
+
+		qt.Tracer.SentShortHeaderPacket = func(hdr *logging.ShortHeader, count logging.ByteCount, ecn logging.ECN, ack *logging.AckFrame, frames []logging.Frame) {
+			// qplogging.Log.Debug("Sent Short Header Packet with size ", count)
+			if qt.Path != nil {
+				qpmetrics.State.AddThroughput(qt.Destination.String(), qt.Path.Id, uint64(count), qt.Path.Sorter)
 			}
 		}
 

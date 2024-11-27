@@ -417,6 +417,7 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 	}
 
 	qplogging.Log.Debug("Done waiting")
+	qpmetrics.State.StartMeasurements()
 	go cp.dp.readLoop()
 	go cp.dp.writeLoop()
 	return nil
@@ -480,6 +481,7 @@ func (cp *ControlPlane) RaceListenDataplaneStreams(numStreams int) error {
 	}
 
 	qplogging.Log.Debug("Done waiting")
+	qpmetrics.State.StartMeasurements()
 	go cp.dp.readLoop()
 	go cp.dp.writeLoop()
 	return nil

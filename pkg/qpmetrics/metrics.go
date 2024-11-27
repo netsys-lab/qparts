@@ -56,6 +56,7 @@ func (n *NetworkState) runDetectionTicker() {
 			for _, path := range rem {
 				// tr := float64(path.Throughput*8*2) / 1024 / 1024
 				// qplogging.Log.Debugf("Path %d: RTT: %d, Packetloss: %d, Throughput: %f Mbit/s, CwndDecreaseEvents: %d, PacketLossEvents: %d", path.PathId, path.RTT, path.Packetloss, tr, path.CwndDecreaseEvents, path.PacketLossEvents)
+				//qplogging.Log.Debugf("Path %s: RTT: %d, Packetloss: %d, Throughput: %d, CwndDecreaseEvents: %d, PacketLossEvents: %d", path.Sorter, path.RTT, path.Packetloss, path.Throughput, path.CwndDecreaseEvents, path.PacketLossEvents)
 				path.Throughput = 0
 				path.Packetloss = 0
 			}
@@ -119,6 +120,27 @@ func (n *NetworkState) AddPacketLoss(remote string, pathId uint64, loss uint64, 
 	}
 
 	n.Remotes[remote][pathId].Packetloss += loss
+}
+
+func (n *NetworkState) AddConnStateRecovery(remote string, pathId uint64, loss uint64, sorter string) {
+
+	if pathId == 0 {
+		panic("PathId cannot be 0")
+	}
+
+	if _, ok := n.Remotes[remote]; !ok {
+		n.Remotes[remote] = make(map[uint64]*PathMetrics)
+	}
+
+	if metrics, ok := n.Remotes[remote][pathId]; !ok {
+		metrics = NewPathMetrics()
+		metrics.PathId = pathId
+		n.Remotes[remote][pathId] = metrics
+		n.Remotes[remote][pathId].Sorter = sorter
+		qplogging.Log.Debugf("Added path %s for remote %s", sorter, remote)
+	}
+
+	n.Remotes[remote][pathId].CwndDecreaseEvents += loss
 }
 
 func (n *NetworkState) AddThroughput(remote string, pathId uint64, bytecount uint64, sorter string) {
@@ -197,11 +219,11 @@ func FindSimilarPaths(paths []PathMetrics, tolerance float64) [][]PathMetrics {
 			//qplogging.Log.Debug("-----------------------------------------------------")
 			ratio1Loss := float64(paths[i].Packetloss) / float64(paths[i].Throughput)
 			ratio2Loss := float64(paths[j].Packetloss) / float64(paths[j].Throughput)
-			// ratio1Cwnd := float64(paths[i].CwndDecreaseEvents) / float64(paths[i].Throughput)
-			// ratio2Cwnd := float64(paths[j].CwndDecreaseEvents) / float64(paths[j].Throughput)
+			ratio1Cwnd := float64(paths[i].CwndDecreaseEvents) / float64(paths[i].Throughput)
+			ratio2Cwnd := float64(paths[j].CwndDecreaseEvents) / float64(paths[j].Throughput)
 
 			// Check similarity
-			if isSimilar(ratio1Loss, ratio2Loss, tolerance) /*|| isSimilar(ratio1Cwnd, ratio2Cwnd, tolerance)*/ {
+			if isSimilar(ratio1Loss, ratio2Loss, tolerance) || isSimilar(ratio1Cwnd, ratio2Cwnd, tolerance) {
 				result = append(result, []PathMetrics{paths[i], paths[j]})
 			}
 		}

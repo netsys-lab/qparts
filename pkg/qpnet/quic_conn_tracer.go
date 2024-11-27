@@ -33,12 +33,13 @@ func (qt *QPartsQuicTracer) NewTracerHandler() func(context context.Context, per
 
 		qt.Tracer = &logging.ConnectionTracer{}
 		qt.Tracer.UpdatedCongestionState = func(state logging.CongestionState) {
-			//if state == logging.CongestionStateRecovery {
-			//	if qt.Path != nil {
-			//	qplogging.Log.Info("Received recovery state on connection ", connectionID)
-			// qplogging.Log.Info("Path: ", qt.Path)
-			//	}
-			//}
+			if state == logging.CongestionStateCongestionAvoidance {
+				if qt.Path != nil {
+					// qplogging.Log.Info("Received recovery state on connection ", connectionID)
+					// qplogging.Log.Info("Path: ", qt.Path.Sorter)
+					qpmetrics.State.AddConnStateRecovery(qt.Destination.String(), qt.Path.Id, 1, qt.Path.Sorter)
+				}
+			}
 		}
 		qt.Tracer.LostPacket = func(encLevel logging.EncryptionLevel, packetNumber logging.PacketNumber, reason logging.PacketLossReason) {
 			if qt.Path != nil {

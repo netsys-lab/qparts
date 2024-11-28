@@ -47,9 +47,9 @@ func NewScheduler() *Scheduler {
 	return s
 }
 
-//func (s *Scheduler) OnCongestionEvent(event *qpnet.CongestionEvent) error {
-//	return s.activePlugin.OnCongestionEvent(event)
-//}
+/*func (s *Scheduler) OnCongestionEvent(event *qpnet.CongestionEvent) error {
+	return s.activePlugin.OnCongestionEvent(event)
+}*/
 
 func (s *Scheduler) ActivatePlugin(p SchedulerPlugin) {
 	// Ensure plugin only added once

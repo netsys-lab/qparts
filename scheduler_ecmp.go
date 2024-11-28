@@ -61,15 +61,26 @@ func (sr *SchedulerECMP) ScheduleWrite(data []byte, stream *PartsStream, dpStrea
 
 	distribution := splitBytes(data, len(dpStreams))
 
-	assignments := make([]DataAssignment, len(dpStreams))
+	assignments := make([]DataAssignment, 0)
 	index := 0
 	for _, p := range dpStreams {
-		da := DataAssignment{
-			// Path: rem.Paths[sr.index],
-			DataplaneStream: p, // dpStreams[0],
-			Data:            distribution[index],
+
+		for j := 0; j < 5; j++ {
+			partSize := len(distribution[index]) / 5
+			max := min((j+1)*partSize, len(distribution[index]))
+
+			if j == 4 {
+				max = len(distribution[index])
+			}
+
+			da := DataAssignment{
+				// Path: rem.Paths[sr.index],
+				DataplaneStream: p, // dpStreams[0],
+				Data:            distribution[index][j*partSize : max],
+			}
+			assignments = append(assignments, da)
 		}
-		assignments[index] = da
+
 		index++
 	}
 

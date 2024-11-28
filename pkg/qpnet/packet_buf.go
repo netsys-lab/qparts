@@ -2,6 +2,8 @@ package qpnet
 
 import (
 	"sync"
+
+	"github.com/netsys-lab/qparts/pkg/qplogging"
 )
 
 // PacketBuffer is a structure that holds a buffer of bytes.
@@ -44,6 +46,8 @@ func (pb *PacketBuffer) Read(n int) []byte {
 	for len(pb.buffer) == 0 {
 		pb.cond.Wait() // Block until notified that data is available
 	}
+
+	qplogging.Log.Debug("Read ", n, " bytes from buffer of size ", len(pb.buffer))
 
 	// If n is larger than the buffer size, adjust it to read what's available
 	if n > len(pb.buffer) {

@@ -173,40 +173,99 @@ func (dp *QPartsDataplane) writeLoop() error {
 func (dp *QPartsDataplane) WriteForStream(schedulingDecision *SchedulingDecision, id uint64) (int, error) {
 	qplogging.Log.Debug("Writing to stream ", id)
 
-	compl := dp.completionStore.NewSequenceCompletionFromSchedulingDecision(id, schedulingDecision)
-	dp.completionStore.AddCompletion(compl)
+	if len(schedulingDecision.Assignments) != 1 {
+		compl := dp.completionStore.NewSequenceCompletionFromSchedulingDecision(id, schedulingDecision)
+		dp.completionStore.AddCompletion(compl)
 
-	// atomic int
-	sentBytes := 0
-	// TODO: Move to queue based approach for all streams?
-	for i, dataAssignment := range schedulingDecision.Assignments {
-		//wg.Add(1)
-		//go func(dataAssignment DataAssignment, i int) {
+		// atomic int
+		sentBytes := 0
+		// TODO: Move to queue based approach for all streams?
+		for i, dataAssignment := range schedulingDecision.Assignments {
+			//wg.Add(1)
+			//go func(dataAssignment DataAssignment, i int) {
 
-		// qplogging.Log.Debugf("Copying data %x from %d to %d \n", sha256.Sum256(dataAssignment.Data), i, i+len(dataAssignment.Data))
-		// qplogging.Log.Debugf("Sent %x on Stream %d for id %d\n", sha256.Sum256(dataAssignment.Data), id, int(partsDatapacket.PartId))
-		//	sentBytes += len(dataAssignment.Data)
-		//	wg.Done()
-		//}(dataAssignment, i)
-		dataAssignment.NumParts = uint64(len(schedulingDecision.Assignments))
-		dataAssignment.SequenceId = compl.SequenceId
-		dataAssignment.PartId = uint64(i)
-		dataAssignment.SequenceSize = compl.SequenceSize
-		dataAssignment.StreamId = id
+			// qplogging.Log.Debugf("Copying data %x from %d to %d \n", sha256.Sum256(dataAssignment.Data), i, i+len(dataAssignment.Data))
+			// qplogging.Log.Debugf("Sent %x on Stream %d for id %d\n", sha256.Sum256(dataAssignment.Data), id, int(partsDatapacket.PartId))
+			//	sentBytes += len(dataAssignment.Data)
+			//	wg.Done()
+			//}(dataAssignment, i)
 
-		dataAssignment.DataplaneStream.Queue.Add(dataAssignment)
-		qplogging.Log.Debug("Added data assignment to queue")
+			for j := 0; j < 5; j++ {
+				da := DataAssignment{
+					DataplaneStream: dataAssignment.DataplaneStream,
+					Remote:          dataAssignment.Remote,
+				}
+				da.NumParts = uint64(len(schedulingDecision.Assignments) * 5)
+				da.SequenceId = compl.SequenceId
+				da.PartId = uint64(i*100 + j)
+				da.SequenceSize = compl.SequenceSize
+				da.StreamId = id
+				dp.partsSize = len(dataAssignment.Data) / 5
+				max := min((j+1)*dp.partsSize, len(dataAssignment.Data))
+				da.Data = dataAssignment.Data[j*dp.partsSize : max]
+				dp.partsSize = len(da.Data)
 
-		sentBytes += len(dataAssignment.Data)
+				dataAssignment.DataplaneStream.Queue.Add(da)
+				qplogging.Log.Debug("Added data assignment to queue")
+
+				sentBytes += len(dataAssignment.Data)
+			}
+
+		}
+
+		fmt.Printf("Waiting for completion %p\n", compl)
+		<-compl.CompleteChan
+		fmt.Println("Sent ", sentBytes, " bytes")
+		return sentBytes, nil
+
+	} else {
+		compl := dp.completionStore.NewSequenceCompletionFromSchedulingDecision(id, schedulingDecision)
+		dp.completionStore.AddCompletion(compl)
+
+		// atomic int
+		sentBytes := 0
+		// TODO: Move to queue based approach for all streams?
+		for i, dataAssignment := range schedulingDecision.Assignments {
+			//wg.Add(1)
+			//go func(dataAssignment DataAssignment, i int) {
+
+			// qplogging.Log.Debugf("Copying data %x from %d to %d \n", sha256.Sum256(dataAssignment.Data), i, i+len(dataAssignment.Data))
+			// qplogging.Log.Debugf("Sent %x on Stream %d for id %d\n", sha256.Sum256(dataAssignment.Data), id, int(partsDatapacket.PartId))
+			//	sentBytes += len(dataAssignment.Data)
+			//	wg.Done()
+			//}(dataAssignment, i)
+
+			for j := 0; j < 5; j++ {
+				da := DataAssignment{
+					DataplaneStream: dataAssignment.DataplaneStream,
+					Remote:          dataAssignment.Remote,
+				}
+				da.NumParts = uint64(len(schedulingDecision.Assignments) * 5)
+				da.SequenceId = compl.SequenceId
+				da.PartId = uint64(i*100 + j)
+				da.SequenceSize = compl.SequenceSize
+				da.StreamId = id
+				dp.partsSize = len(dataAssignment.Data) / 5
+				max := min((j+1)*dp.partsSize, len(dataAssignment.Data))
+				da.Data = dataAssignment.Data[j*dp.partsSize : max]
+				dp.partsSize = len(da.Data)
+
+				dataAssignment.DataplaneStream.Queue.Add(da)
+				qplogging.Log.Debug("Added data assignment to queue")
+
+				sentBytes += len(dataAssignment.Data)
+			}
+
+		}
+
+		fmt.Printf("Waiting for completion %p\n", compl)
+		<-compl.CompleteChan
+		fmt.Println("Sent ", sentBytes, " bytes")
+		return sentBytes, nil
+
 	}
 
 	// dp.completionStore.RemoveCompletion(compl.SequenceId)
-
-	// wg.Wait()
-	fmt.Printf("Waiting for completion %p\n", compl)
-	<-compl.CompleteChan
-	fmt.Println("Sent ", sentBytes, " bytes")
-	return sentBytes, nil
 }
 
 func (dp *QPartsDataplane) readLoop() error {

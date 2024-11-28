@@ -2,6 +2,7 @@ package qparts
 
 import (
 	"math/rand"
+	"sort"
 	"sync"
 
 	"github.com/netsys-lab/qparts/pkg/qplogging"
@@ -15,7 +16,7 @@ type QPartsSequenceCompletion struct {
 	SequenceSize   uint64
 	CompletedParts int
 	Data           []byte
-	internalParts  [][]byte
+	internalParts  map[int][]byte
 	Completed      bool
 	CompleteChan   chan bool
 }
@@ -42,19 +43,29 @@ func (sc *QPartsSequenceCompletion) AddPart(index int, data []byte) bool {
 	defer sc.Unlock()
 	qplogging.Log.Debug("Adding part ", index)
 	sc.CompletedParts++
-	sc.internalParts = append(sc.internalParts, data)
+	sc.internalParts[index] = data
 
 	// Copy into data starting from index
 	// qplogging.Log.Debugf("Copying data %x with len %d \n", sha256.Sum256(data), len(data))
 	//
 	compl := sc.IsComplete()
 	if compl {
+
+		keys := make([]int, 0, len(sc.internalParts))
+		for k := range sc.internalParts {
+			keys = append(keys, k)
+		}
+		sort.Ints(keys)
+
 		offset := 0
 		copied := 0
-		for _, part := range sc.internalParts {
+
+		for _, k := range keys {
+			part := sc.internalParts[k]
 			copied += copy(sc.Data[offset:], part)
 			offset += len(part)
 		}
+
 		sc.Completed = true
 		// qplogging.Log.Debugf("COMPLETE Hash %x with len %d and copied %d\n", sha256.Sum256(sc.Data), len(sc.Data), copied)
 	}
@@ -124,7 +135,7 @@ func (cs *CompletionStore) GetOrCreateSendingSequenceCompletion(streamId uint64,
 		SequenceId:    sequenceId,
 		Parts:         int(numParts),
 		SequenceSize:  sequenceSize,
-		internalParts: make([][]byte, numParts),
+		internalParts: make(map[int][]byte, 0),
 		CompleteChan:  make(chan bool),
 	}
 	qplogging.Log.Debugf("Creating sending completion for stream %d with sequence %d and %d parts and sequenceSize %d \n", streamId, sequenceId, numParts, sequenceSize)
@@ -148,7 +159,7 @@ func (cs *CompletionStore) GetOrCreateSequenceCompletion(streamId uint64, sequen
 		SequenceId:    sequenceId,
 		Parts:         int(numParts),
 		SequenceSize:  sequenceSize,
-		internalParts: make([][]byte, numParts),
+		internalParts: make(map[int][]byte, 0),
 		CompleteChan:  make(chan bool),
 	}
 	qplogging.Log.Debugf("Creating completion for stream %d with sequence %d and %d parts and sequenceSize %d \n", streamId, sequenceId, numParts, sequenceSize)

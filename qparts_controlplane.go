@@ -30,6 +30,8 @@ type ControlPlane struct {
 	remoteHandshake      *qpproto.QPartsHandshakePacket
 	pConn                *QPartsConn
 	initialPathSelection []qpscion.QPartsPath
+	dialOpts             *QPartsDialOpts
+	listenOpts           *QPartsListenOpts
 }
 
 func NewQPartsControlPlane(local *snet.UDPAddr, streams map[uint64]*PartsStream, dp *QPartsDataplane, pconn *QPartsConn) *ControlPlane {
@@ -125,7 +127,12 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 		log.Log.Debug("Got reply handshake")
 		// log.Log.Info("Count ", n)
 
-		cp.RaceDialDataplaneStreams()
+		if cp.dialOpts != nil && cp.dialOpts.PathSelectionResponsibility == QPARTS_PATH_SEL_RESPONSIBILITY_SERVER {
+			cp.RaceListenDataplaneStreams(len(initialPathSelection))
+		} else {
+			cp.RaceDialDataplaneStreams()
+		}
+
 		qplogging.Log.Debug("Done racing")
 
 		break
@@ -187,7 +194,24 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		log.Log.Debug("Sent reply stream handshake")
 		//}()
 
-		cp.RaceListenDataplaneStreams(int(remoteHs.NumStreams))
+		if cp.listenOpts != nil && cp.listenOpts.PathSelectionResponsibility == QPARTS_PATH_SEL_RESPONSIBILITY_SERVER {
+			paths, err := qpscion.Paths.Get(remote)
+			if err != nil {
+				return err
+			}
+
+			// TODO: Conn Preference?
+			initialPathSelection, err := cp.Scheduler.InitialPathSelection(0, paths)
+			if err != nil {
+				return err
+			}
+
+			cp.initialPathSelection = initialPathSelection
+			cp.RaceDialDataplaneStreams()
+		} else {
+			cp.RaceListenDataplaneStreams(int(remoteHs.NumStreams))
+		}
+
 		qplogging.Log.Debug("Done racing")
 		break
 	}

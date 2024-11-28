@@ -1,5 +1,8 @@
 package main
 
+// ./filetransfer client 1-13,10.13.0.71:31002 1-10,10.10.0.71:31011 filetransfer
+// ./filetransfer server 1-10,10.10.0.71:31011
+
 import (
 	"crypto/sha256"
 	"encoding/binary"
@@ -18,7 +21,8 @@ func main() {
 	localAddr := os.Args[2]
 
 	if mode == "server" {
-		listener, err := qparts.Listen(localAddr)
+		opts := &qparts.QPartsListenOpts{PathSelectionResponsibility: qparts.QPARTS_PATH_SEL_RESPONSIBILITY_SERVER}
+		listener, err := qparts.ListenWithOpts(localAddr, opts)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -97,7 +101,8 @@ func main() {
 		remoteAddr := os.Args[3]
 		file := os.Args[4]
 		fmt.Println(remoteAddr)
-		conn, err := qparts.Dial(localAddr, remoteAddr)
+		opts := &qparts.QPartsDialOpts{PathSelectionResponsibility: qparts.QPARTS_PATH_SEL_RESPONSIBILITY_SERVER}
+		conn, err := qparts.DialWithOpts(localAddr, remoteAddr, opts)
 		if err != nil {
 			log.Fatal(err)
 		}

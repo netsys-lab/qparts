@@ -62,7 +62,8 @@ func NewQPartsConn(local *snet.UDPAddr) *QPartsConn {
 	return partsConn
 }
 
-func (p *QPartsConn) DialAndOpen(remote *snet.UDPAddr) error {
+func (p *QPartsConn) DialAndOpen(remote *snet.UDPAddr, opts *QPartsDialOpts) error {
+	p.ControlPlane.dialOpts = opts
 	err := p.ControlPlane.Connect(remote)
 	if err != nil {
 		return err
@@ -72,7 +73,8 @@ func (p *QPartsConn) DialAndOpen(remote *snet.UDPAddr) error {
 	return nil
 }
 
-func (p *QPartsConn) ListenAndAccept() error {
+func (p *QPartsConn) ListenAndAccept(opts *QPartsListenOpts) error {
+	p.ControlPlane.listenOpts = opts
 	err := p.ControlPlane.ListenAndAccept()
 	if err != nil {
 		return err

@@ -9,11 +9,13 @@ import (
 type QPartsListener struct {
 	local *snet.UDPAddr
 	conn  *QPartsConn
+	opts  *QPartsListenOpts
 }
 
-func NewQPartsListener(local *snet.UDPAddr) *QPartsListener {
+func NewQPartsListener(local *snet.UDPAddr, opts *QPartsListenOpts) *QPartsListener {
 	return &QPartsListener{
 		local: local,
+		opts:  opts,
 	}
 }
 
@@ -22,7 +24,7 @@ func (ql *QPartsListener) Accept() (*QPartsConn, error) {
 	conn := NewQPartsConn(ql.local)
 	ql.conn = conn
 
-	err := conn.ListenAndAccept()
+	err := conn.ListenAndAccept(ql.opts)
 	if err != nil {
 		return nil, err
 	}

@@ -1,5 +1,7 @@
 package main
 
+// ./filetransfer client 1-13,10.13.0.71:31002 1-10,10.10.0.71:31011 filetransfer
+// ./filetransfer server 1-10,10.10.0.71:31011
 import (
 	"crypto/sha256"
 	"encoding/binary"

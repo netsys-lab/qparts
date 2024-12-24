@@ -2,7 +2,6 @@ package qparts
 
 import (
 	"github.com/netsys-lab/qparts/pkg/qpmetrics"
-	"github.com/netsys-lab/qparts/pkg/qpscion"
 	"github.com/scionproto/scion/pkg/snet"
 )
 
@@ -31,9 +30,18 @@ type SchedulingDecision struct {
 
 type SchedulerPlugin interface {
 	ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision
-	InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error)
-	PathSelectionForProbing(preference uint32, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
-	PathSelectionAfterCongestionEvent(preference uint32, event *qpmetrics.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
+	OnNewStream(remote string, preference uint32)
+	InitialPathSelection(remote string, preference uint32)
+	OnPathProbeInterval(remote string)
+	OnCongestionEvent(event *qpmetrics.CongestionEvent)
+	OnPathDown(remote string, pathId uint64)
+	OnPathAdd(remote string, pathId uint64)
+
+	//InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error)
+	//PathSelectionForProbing(preference uint32, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
+	//PathSelectionAfterCongestionEvent(preference uint32, event *qpmetrics.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
+	//PathSelectionAfterDownEvent(preference uint32, event *qpmetrics.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
+	//PathSelectionForNewStream(preference uint32, event *qpmetrics.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath
 }
 
 func NewScheduler() *Scheduler {
@@ -64,7 +72,26 @@ func (s *Scheduler) ScheduleWrite(data []byte, stream *PartsStream, dpStreams ma
 	return s.activePlugin.ScheduleWrite(data, stream, dpStreams)
 }
 
-func (s *Scheduler) InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error) {
-	// Implement the logic for initial path selection here
-	return s.activePlugin.InitialPathSelection(preference, paths)
+func (sr *Scheduler) OnNewStream(remote string, preference uint32) {
+	sr.activePlugin.OnNewStream(remote, preference)
+}
+
+func (sr *Scheduler) InitialPathSelection(remote string, preference uint32) {
+	sr.activePlugin.OnNewStream(remote, preference)
+}
+
+func (sr *Scheduler) OnPathProbeInterval(remote string) {
+	sr.activePlugin.OnPathProbeInterval(remote)
+}
+
+func (sr *Scheduler) OnCongestionEvent(event *qpmetrics.CongestionEvent) {
+	sr.activePlugin.OnCongestionEvent(event)
+}
+
+func (sr *Scheduler) OnPathDown(remote string, pathId uint64) {
+	sr.activePlugin.OnPathDown(remote, pathId)
+}
+
+func (sr *Scheduler) OnPathAdd(remote string, pathId uint64) {
+	sr.activePlugin.OnPathAdd(remote, pathId)
 }

@@ -2,9 +2,12 @@ package qparts
 
 import (
 	"fmt"
+	"math"
 	"sync"
+	"time"
 
 	"github.com/netsys-lab/qparts/pkg/qplogging"
+	"github.com/netsys-lab/qparts/pkg/qpmetrics"
 	"github.com/netsys-lab/qparts/pkg/qpnet"
 	"github.com/netsys-lab/qparts/pkg/qpproto"
 	"github.com/netsys-lab/qparts/pkg/qpscion"
@@ -46,9 +49,10 @@ type QPartsDataplaneStream struct {
 	sync.Mutex
 	ssqc *qpnet.SingleStreamQUICConn
 	// path      snet.DataplanePath
-	PartsPath  *qpscion.QPartsPath
-	Queue      *qpnet.Queue[DataAssignment]
-	StreamType uint32
+	PartsPath       *qpscion.QPartsPath
+	Queue           *qpnet.Queue[DataAssignment]
+	StreamType      uint32
+	OptimalPartSize int
 }
 
 func NewQPartsDataplane(scheduler *Scheduler, partsStreams map[uint64]*PartsStream) *QPartsDataplane {
@@ -58,6 +62,50 @@ func NewQPartsDataplane(scheduler *Scheduler, partsStreams map[uint64]*PartsStre
 		QPartsStreams:   partsStreams,
 		completionStore: NewCompletionStore(),
 		partsSize:       1000024,
+	}
+}
+
+func (n *QPartsDataplane) DetectCongestion() {
+	allPaths := make([]qpmetrics.PathMetrics, 0)
+	for _, rem := range qpmetrics.State.Remotes {
+		for _, path := range rem {
+
+			if path.Path.Id == 0 || path.Throughput == 0 {
+				continue
+			}
+
+			allPaths = append(allPaths, *path)
+		}
+	}
+
+	simPaths := FindSimilarPaths(allPaths, 0.1)
+	fmt.Println("Similar Paths:")
+	for _, pair := range simPaths {
+		fmt.Printf("Pair: PathId %s and PathId %s\n", pair[0].Path.Sorter, pair[1].Path.Sorter)
+	}
+}
+
+func (dp *QPartsDataplane) StartMeasurements() {
+	go dp.runDetectionTicker()
+}
+
+func (dp *QPartsDataplane) runDetectionTicker() {
+	ticker := time.NewTicker(500 * time.Millisecond)
+
+	for range ticker.C {
+		qplogging.Log.Debug("Running stats check")
+		dp.DetectCongestion()
+
+		for _, rem := range qpmetrics.State.Remotes {
+			for _, path := range rem {
+				// tr := float64(path.Throughput*8*2) / 1024 / 1024
+				// qplogging.Log.Debugf("Path %d: RTT: %d, Packetloss: %d, Throughput: %f Mbit/s, CwndDecreaseEvents: %d, PacketLossEvents: %d", path.PathId, path.RTT, path.Packetloss, tr, path.CwndDecreaseEvents, path.PacketLossEvents)
+				//qplogging.Log.Debugf("Path %s: RTT: %d, Packetloss: %d, Throughput: %d, CwndDecreaseEvents: %d, PacketLossEvents: %d", path.Sorter, path.RTT, path.Packetloss, path.Throughput, path.CwndDecreaseEvents, path.PacketLossEvents)
+				path.Throughput = 0
+				path.Packetloss = 0
+			}
+		}
+
 	}
 }
 
@@ -273,4 +321,45 @@ func (dp *QPartsDataplane) readLoop() error {
 
 	wg.Wait()
 	return nil
+}
+
+// FindSimilarPaths finds paths with similar PacketLossEvents/Throughput or CwndDecreaseEvents/Throughput ratios
+func FindSimilarPaths(paths []qpmetrics.PathMetrics, tolerance float64) [][]qpmetrics.PathMetrics {
+	var result [][]qpmetrics.PathMetrics
+
+	// Helper function to calculate similarity
+	isSimilar := func(a, b float64, tol float64) bool {
+		fmt.Println(a, b, tol, math.Abs(a-b))
+		return math.Abs(a-b) <= tol
+	}
+
+	for i := 0; i < len(paths); i++ {
+		for j := i + 1; j < len(paths); j++ {
+			// Avoid division by zero
+			if paths[i].Throughput == 0 || paths[j].Throughput == 0 {
+				continue
+			}
+
+			if paths[i].Packetloss == 0 || paths[j].Packetloss == 0 {
+				continue
+			}
+
+			// Calculate ratios
+			//qplogging.Log.Debug("-----------------------------------------------------")
+			//qplogging.Log.Debugf("Path %d: Throughput: %d, Packetloss: %d", paths[i].PathId, paths[i].Throughput, paths[i].Packetloss)
+			//qplogging.Log.Debugf("Path %d: Throughput: %d, Packetloss: %d", paths[j].PathId, paths[j].Throughput, paths[j].Packetloss)
+			//qplogging.Log.Debug("-----------------------------------------------------")
+			ratio1Loss := float64(paths[i].Packetloss) / float64(paths[i].Throughput)
+			ratio2Loss := float64(paths[j].Packetloss) / float64(paths[j].Throughput)
+			ratio1Cwnd := float64(paths[i].CwndDecreaseEvents) / float64(paths[i].Throughput)
+			ratio2Cwnd := float64(paths[j].CwndDecreaseEvents) / float64(paths[j].Throughput)
+
+			// Check similarity
+			if isSimilar(ratio1Loss, ratio2Loss, tolerance) || isSimilar(ratio1Cwnd, ratio2Cwnd, tolerance) {
+				result = append(result, []qpmetrics.PathMetrics{paths[i], paths[j]})
+			}
+		}
+	}
+
+	return result
 }

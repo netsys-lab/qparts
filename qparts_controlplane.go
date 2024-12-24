@@ -29,7 +29,7 @@ type ControlPlane struct {
 	localHandshake       *qpproto.QPartsHandshakePacket
 	remoteHandshake      *qpproto.QPartsHandshakePacket
 	pConn                *QPartsConn
-	initialPathSelection []qpscion.QPartsPath
+	initialPathSelection []*qpscion.QPartsPath
 	dialOpts             *QPartsDialOpts
 	listenOpts           *QPartsListenOpts
 }
@@ -74,12 +74,12 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 	}
 
 	// TODO: Conn Preference?
-	initialPathSelection, err := cp.Scheduler.InitialPathSelection(0, paths)
+	cp.Scheduler.InitialPathSelection(remote.String(), 0)
 	if err != nil {
 		return err
 	}
 
-	cp.initialPathSelection = initialPathSelection
+	cp.initialPathSelection = qpmetrics.State.ActivePaths(remote.String())
 
 	rAddr := remote.Copy()
 	rAddr.NextHop = paths[0].Internal.UnderlayNextHop()
@@ -99,7 +99,7 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 	hs.Version = getVersion()
 	hs.StartPortRange = 31500
 	hs.EndPortRange = 31510
-	hs.NumStreams = uint16(len(initialPathSelection))
+	hs.NumStreams = uint16(len(cp.initialPathSelection))
 	hs.Encode()
 
 	cp.localHandshake = hs
@@ -128,7 +128,7 @@ func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
 		// log.Log.Info("Count ", n)
 
 		if cp.dialOpts != nil && cp.dialOpts.PathSelectionResponsibility == QPARTS_PATH_SEL_RESPONSIBILITY_SERVER {
-			cp.RaceListenDataplaneStreams(len(initialPathSelection))
+			cp.RaceListenDataplaneStreams(len(cp.initialPathSelection))
 		} else {
 			cp.RaceDialDataplaneStreams()
 		}
@@ -195,18 +195,13 @@ func (cp *ControlPlane) ListenAndAccept() error {
 		//}()
 
 		if cp.listenOpts != nil && cp.listenOpts.PathSelectionResponsibility == QPARTS_PATH_SEL_RESPONSIBILITY_SERVER {
-			paths, err := qpscion.Paths.Get(remote)
-			if err != nil {
-				return err
-			}
-
 			// TODO: Conn Preference?
-			initialPathSelection, err := cp.Scheduler.InitialPathSelection(0, paths)
+			cp.Scheduler.InitialPathSelection(remote.String(), 0)
 			if err != nil {
 				return err
 			}
 
-			cp.initialPathSelection = initialPathSelection
+			cp.initialPathSelection = qpmetrics.State.ActivePaths(remote.String())
 			cp.RaceDialDataplaneStreams()
 		} else {
 			cp.RaceListenDataplaneStreams(int(remoteHs.NumStreams))
@@ -432,7 +427,7 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 				return
 			}
 
-		}(i, &path)
+		}(i, path)
 	}
 	wg.Wait()
 
@@ -441,7 +436,7 @@ func (cp *ControlPlane) RaceDialDataplaneStreams() error {
 	}
 
 	qplogging.Log.Debug("Done waiting")
-	qpmetrics.State.StartMeasurements()
+	cp.dp.StartMeasurements()
 	go cp.dp.readLoop()
 	go cp.dp.writeLoop()
 	return nil
@@ -505,7 +500,7 @@ func (cp *ControlPlane) RaceListenDataplaneStreams(numStreams int) error {
 	}
 
 	qplogging.Log.Debug("Done waiting")
-	qpmetrics.State.StartMeasurements()
+	cp.dp.StartMeasurements()
 	go cp.dp.readLoop()
 	go cp.dp.writeLoop()
 	return nil

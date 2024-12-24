@@ -10,6 +10,20 @@ import (
 	"github.com/scionproto/scion/pkg/snet"
 )
 
+const (
+	QPARTS_PATH_STATE_ACTIVE = iota
+	QPARTS_PATH_STATE_INACTIVE
+	QPARTS_PATH_STATE_PROBING
+	QPARTS_PATH_STATE_CONGESTED
+	QPARTS_PATH_STATE_DOWN
+)
+
+const (
+	QPARTS_PATH_PREF_LOW_LATENCY = iota
+	QPARTS_PATH_PREF_HIGH_THROUGHPUT
+	QPARTS_PATH_PREF_BALANCED
+)
+
 type QPartsPath struct {
 	Internal    snet.Path
 	Interfaces  []string
@@ -18,6 +32,8 @@ type QPartsPath struct {
 	MTU         int
 	PayloadSize int
 	Hops        int
+	State       int
+	Pref        int
 }
 
 func IdFromSnetPath(path snet.Path) string {
@@ -74,6 +90,7 @@ func QueryPaths(remote addr.IA) ([]QPartsPath, error) {
 			Sorter:      pathSorter,
 			PayloadSize: 1200, // TODO: Payloadsize
 			Hops:        len(path.Metadata().Interfaces) / 2,
+			State:       QPARTS_PATH_STATE_INACTIVE,
 		}
 		PartsPath.Sorter = strings.Join(PartsPath.Interfaces, ",")
 		PartsPaths = append(PartsPaths, PartsPath)

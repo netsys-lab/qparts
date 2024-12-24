@@ -66,7 +66,7 @@ func (cp *ControlPlane) HandleCongestionEvent(event *qpmetrics.CongestionEvent) 
 	return nil
 }
 
-func (cp *ControlPlane) Connect(remote *snet.UDPAddr) error {
+func (cp *ControlPlane) Connect(remote *snet.UDPAddr, preference uint32) error {
 
 	paths, err := qpscion.Paths.Get(remote)
 	if err != nil {
@@ -312,7 +312,7 @@ func (p *ControlPlane) AcceptStream() (*PartsStream, error) {
 	return s, nil
 }
 
-func (cp *ControlPlane) OpenStream() (*PartsStream, error) {
+func (cp *ControlPlane) OpenStream(pref uint32) (*PartsStream, error) {
 	s := &PartsStream{
 		Id: newConnId(),
 		// scheduler:  cp.Scheduler,

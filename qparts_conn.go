@@ -64,7 +64,18 @@ func NewQPartsConn(local *snet.UDPAddr) *QPartsConn {
 
 func (p *QPartsConn) DialAndOpen(remote *snet.UDPAddr, opts *QPartsDialOpts) error {
 	p.ControlPlane.dialOpts = opts
-	err := p.ControlPlane.Connect(remote)
+	err := p.ControlPlane.Connect(remote, 0)
+	if err != nil {
+		return err
+	}
+
+	// Open internal QUIC streams
+	return nil
+}
+
+func (p *QPartsConn) DialAndOpenWithPreference(remote *snet.UDPAddr, opts *QPartsDialOpts, preference uint32) error {
+	p.ControlPlane.dialOpts = opts
+	err := p.ControlPlane.Connect(remote, preference)
 	if err != nil {
 		return err
 	}
@@ -102,7 +113,17 @@ func (p *QPartsConn) AcceptStream() (*PartsStream, error) {
 }
 
 func (p *QPartsConn) OpenStream() (*PartsStream, error) {
-	s, err := p.ControlPlane.OpenStream()
+	s, err := p.ControlPlane.OpenStream(0)
+	if err != nil {
+		return nil, err
+	}
+
+	p.Streams[s.Id] = s
+	return s, nil
+}
+
+func (p *QPartsConn) OpenStreamWithPreference(preference uint32) (*PartsStream, error) {
+	s, err := p.ControlPlane.OpenStream(preference)
 	if err != nil {
 		return nil, err
 	}

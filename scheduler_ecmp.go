@@ -1,7 +1,6 @@
 package qparts
 
 import (
-	"fmt"
 	"math/rand"
 
 	"github.com/netsys-lab/qparts/pkg/qplogging"
@@ -22,12 +21,43 @@ func NewSchedulerECMP() *SchedulerECMP {
 	}
 }
 
-func (sr *SchedulerECMP) PathSelectionAfterCongestionEvent(preference uint32, event *qpmetrics.CongestionEvent, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath {
-	return nil
+func (sr *SchedulerECMP) OnNewStream(remote string, preference uint32) {
+
 }
 
-func (sr *SchedulerECMP) PathSelectionForProbing(preference uint32, availablePaths []qpscion.QPartsPath, pathsInUse []qpscion.QPartsPath) []qpscion.QPartsPath {
-	return availablePaths
+func (sr *SchedulerECMP) InitialPathSelection(remote string, preference uint32) {
+	// Implement the logic for initial path selection here
+	qplogging.Log.Debug("Selecting paths for ECMP initially")
+
+	lowLatency, highThroughput := selectLowLatencyAndHighThroughputPaths(remote)
+	qplogging.Log.Debug("Low Latency Path:", lowLatency.Sorter)
+
+	r := qpmetrics.State.Remotes[remote]
+	r[lowLatency.Id].Path.Pref = qpscion.QPARTS_PATH_PREF_LOW_LATENCY
+	r[lowLatency.Id].Path.State = qpscion.QPARTS_PATH_STATE_ACTIVE
+
+	for _, p := range highThroughput {
+		r[p.Id].Path.Pref = qpscion.QPARTS_PATH_PREF_HIGH_THROUGHPUT
+		r[p.Id].Path.State = qpscion.QPARTS_PATH_STATE_ACTIVE
+	}
+
+	// qplogging.Log.Debug("High Throughput Paths:", highThroughput[0].Id, highThroughput[1].Id)
+	qplogging.Log.Debug("Selected ", len(highThroughput)+1, " paths for initial path selection")
+	// qplogging.Log.Debug(paths[:3])
+
+}
+
+func (sr *SchedulerECMP) OnPathProbeInterval(remote string) {
+
+}
+func (sr *SchedulerECMP) OnCongestionEvent(event *qpmetrics.CongestionEvent) {
+
+}
+func (sr *SchedulerECMP) OnPathDown(remote string, pathId uint64) {
+
+}
+func (sr *SchedulerECMP) OnPathAdd(remote string, pathId uint64) {
+
 }
 
 func (sr *SchedulerECMP) ScheduleWrite(data []byte, stream *PartsStream, dpStreams map[uint64]*QPartsDataplaneStream) SchedulingDecision {
@@ -61,15 +91,30 @@ func (sr *SchedulerECMP) ScheduleWrite(data []byte, stream *PartsStream, dpStrea
 
 	distribution := splitBytes(data, len(dpStreams))
 
-	assignments := make([]DataAssignment, len(dpStreams))
+	assignments := make([]DataAssignment, 0)
 	index := 0
+
+	// Just iterate over streams and give each stream a size, then continue
+
 	for _, p := range dpStreams {
-		da := DataAssignment{
-			// Path: rem.Paths[sr.index],
-			DataplaneStream: p, // dpStreams[0],
-			Data:            distribution[index],
+
+		// TODO: SPlit this by dpStream.OptimalPartSize
+		for j := 0; j < 5; j++ {
+			partSize := len(distribution[index]) / 5
+			max := min((j+1)*partSize, len(distribution[index]))
+
+			if j == 4 {
+				max = len(distribution[index])
+			}
+
+			da := DataAssignment{
+				// Path: rem.Paths[sr.index],
+				DataplaneStream: p, // dpStreams[0],
+				Data:            distribution[index][j*partSize : max],
+			}
+			assignments = append(assignments, da)
 		}
-		assignments[index] = da
+
 		index++
 	}
 
@@ -118,44 +163,10 @@ func splitBytes(data []byte, n int) [][]byte {
 	return parts
 }
 
-func (sr *SchedulerECMP) InitialPathSelection(preference uint32, paths []qpscion.QPartsPath) ([]qpscion.QPartsPath, error) {
-	// Implement the logic for initial path selection here
-	qplogging.Log.Debug("Selecting paths for ECMP initially")
-
-	/*tpaths := []qpscion.QPartsPath{
-		{Id: 1, Interfaces: []string{"A", "B", "C"}, MTU: 1452, Hops: 3},
-		{Id: 2, Interfaces: []string{"A", "D", "E"}, MTU: 1472, Hops: 5},
-		{Id: 3, Interfaces: []string{"A", "F"}, MTU: 1472, Hops: 2},
-		{Id: 4, Interfaces: []string{"A", "G", "H"}, MTU: 1472, Hops: 5},
-		{Id: 5, Interfaces: []string{"A", "I", "J"}, MTU: 1452, Hops: 6},
-	}*/
-
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("no paths available for initial path selection")
-	}
-
-	lowLatency, highThroughput := selectPaths(paths)
-	qplogging.Log.Debug("Low Latency Path:", lowLatency.Sorter)
-
-	returnPaths := make([]qpscion.QPartsPath, 0)
-	returnPaths = append(returnPaths, lowLatency)
-
-	if len(highThroughput) > 0 {
-		for i, p := range highThroughput {
-			qplogging.Log.Debugf("High Throughput path %d: %s", i, p.Sorter)
-			returnPaths = append(returnPaths, p)
-		}
-	}
-
-	// qplogging.Log.Debug("High Throughput Paths:", highThroughput[0].Id, highThroughput[1].Id)
-	qplogging.Log.Debug("Selected ", len(returnPaths), " paths for initial path selection")
-	// qplogging.Log.Debug(paths[:3])
-	return returnPaths, nil
-	//return paths[:3], nil
-}
-
 // selectPaths selects paths for low latency and high throughput
-func selectPaths(paths []qpscion.QPartsPath) (lowLatency qpscion.QPartsPath, highThroughput []qpscion.QPartsPath) {
+func selectLowLatencyAndHighThroughputPaths(remote string) (lowLatency *qpscion.QPartsPath, highThroughput []*qpscion.QPartsPath) {
+
+	paths := qpmetrics.State.ToPathSlice(remote)
 
 	// Use the same path for everything
 	if len(paths) == 1 {
@@ -190,7 +201,7 @@ func selectPaths(paths []qpscion.QPartsPath) (lowLatency qpscion.QPartsPath, hig
 }
 
 // findMinHops finds the minimum hops among paths
-func findMinHops(paths []qpscion.QPartsPath) int {
+func findMinHops(paths []*qpscion.QPartsPath) int {
 	minHops := paths[0].Hops
 	for _, p := range paths {
 		if p.Hops < minHops {
@@ -201,8 +212,8 @@ func findMinHops(paths []qpscion.QPartsPath) int {
 }
 
 // filterPathsByHops filters paths with the given hop count
-func filterPathsByHops(paths []qpscion.QPartsPath, hops int) []qpscion.QPartsPath {
-	var filtered []qpscion.QPartsPath
+func filterPathsByHops(paths []*qpscion.QPartsPath, hops int) []*qpscion.QPartsPath {
+	var filtered []*qpscion.QPartsPath
 	for _, p := range paths {
 		if p.Hops == hops {
 			filtered = append(filtered, p)
@@ -212,7 +223,7 @@ func filterPathsByHops(paths []qpscion.QPartsPath, hops int) []qpscion.QPartsPat
 }
 
 // findMaxMTU finds the maximum MTU among paths
-func findMaxMTU(paths []qpscion.QPartsPath) int {
+func findMaxMTU(paths []*qpscion.QPartsPath) int {
 	maxMTU := paths[0].MTU
 	for _, p := range paths {
 		if p.MTU > maxMTU {
@@ -223,8 +234,8 @@ func findMaxMTU(paths []qpscion.QPartsPath) int {
 }
 
 // filterPathsByMTU filters paths with the given MTU and excludes a specific path
-func filterPathsByMTU(paths []qpscion.QPartsPath, mtu int, exclude qpscion.QPartsPath) []qpscion.QPartsPath {
-	var filtered []qpscion.QPartsPath
+func filterPathsByMTU(paths []*qpscion.QPartsPath, mtu int, exclude *qpscion.QPartsPath) []*qpscion.QPartsPath {
+	var filtered []*qpscion.QPartsPath
 	for _, p := range paths {
 		if p.MTU == mtu && p.Id != exclude.Id {
 			filtered = append(filtered, p)
@@ -234,13 +245,13 @@ func filterPathsByMTU(paths []qpscion.QPartsPath, mtu int, exclude qpscion.QPart
 }
 
 // excludePath excludes specific paths from a list
-func excludePath(paths []qpscion.QPartsPath, exclude []qpscion.QPartsPath) []qpscion.QPartsPath {
+func excludePath(paths []*qpscion.QPartsPath, exclude []*qpscion.QPartsPath) []*qpscion.QPartsPath {
 	excludeMap := make(map[uint64]bool)
 	for _, p := range exclude {
 		excludeMap[p.Id] = true
 	}
 
-	var filtered []qpscion.QPartsPath
+	var filtered []*qpscion.QPartsPath
 	for _, p := range paths {
 		if !excludeMap[p.Id] {
 			filtered = append(filtered, p)
@@ -250,19 +261,19 @@ func excludePath(paths []qpscion.QPartsPath, exclude []qpscion.QPartsPath) []qps
 }
 
 // selectRandomPath selects a random path from a list
-func selectRandomPath(paths []qpscion.QPartsPath) qpscion.QPartsPath {
+func selectRandomPath(paths []*qpscion.QPartsPath) *qpscion.QPartsPath {
 	return paths[rand.Intn(len(paths))]
 }
 
 // shufflePaths shuffles the order of paths
-func shufflePaths(paths []qpscion.QPartsPath) {
+func shufflePaths(paths []*qpscion.QPartsPath) {
 	rand.Shuffle(len(paths), func(i, j int) {
 		paths[i], paths[j] = paths[j], paths[i]
 	})
 }
 
 // selectTopN selects the top N paths from a list
-func selectTopN(paths []qpscion.QPartsPath, n int) []qpscion.QPartsPath {
+func selectTopN(paths []*qpscion.QPartsPath, n int) []*qpscion.QPartsPath {
 	if n > len(paths) {
 		n = len(paths)
 	}

@@ -20,15 +20,16 @@
 - Ignore timeouts for dataplane streams, send keepalives
 - Handle timeouts in racedial/listendial properly
 - Handle pathdown / errors when sending -> trigger event
-- Pass full QParts object to metrics
+- [x] Pass full QParts object to metrics
 - Add disjointness check for Path Similarity
 - Send acknowledgements over control conn informing about the performance of completion -> not yet used in the paper
-- Add path states: Unknown,Probing,Selected,Stale,Inactive
+- [x] Add path states: Unknown,Probing,Selected,Stale,Inactive
 - Switch to one big sending queue instead of per datastream queue
 - Use magic formula (or just Congestion Window Size) as part size for streams to fetch parts of data to be transferred
 - Restructure Scheduler to PathSelector
 - Implement all path selection methods defined in the paper
-- Add PathSelectionResponsibility to handshake, switch racelisten/dial accordingly.
+- [x] Add PathSelectionResponsibility to handshake, switch racelisten/dial accordingly.
+- OnPathDown in OptimizedConn
 
 ## Bugs
 - Sometimes concurrent map write call

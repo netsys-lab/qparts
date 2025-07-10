@@ -103,6 +103,7 @@ func (s *PartsStream) Write(b []byte) (n int, err error) {
 			//Log.Info(assignments.Assignments[i].Remote)
 		}
 		return s.conn.Dataplane.WriteForStream(&assignments, s.Id)
+		// return s.conn.Dataplane.WriteDataForStream(b, s.Id)
 	}
 
 	// Deadline is set, lock the mutex to safely access the deadline
@@ -123,6 +124,7 @@ func (s *PartsStream) Write(b []byte) (n int, err error) {
 		//Log.Info(assignments.Assignments[i].Remote)
 	}
 	return s.conn.Dataplane.WriteForStream(&assignments, s.Id)
+	// return s.conn.Dataplane.WriteDataForStream(b, s.Id)
 
 }
 
